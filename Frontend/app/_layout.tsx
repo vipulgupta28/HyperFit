@@ -1,10 +1,11 @@
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { OnboardingGuide } from '@/src/components/OnboardingGuide';
 import { PALETTE } from '@/src/constants/game';
 import { useUserStore } from '@/src/store/userStore';
 
@@ -45,6 +46,33 @@ function AuthGuard() {
   return null;
 }
 
+function OnboardingLayer() {
+  const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const hasSeenOnboarding = useUserStore((s) => s.hasSeenOnboarding);
+  const markOnboardingDone = useUserStore((s) => s.markOnboardingDone);
+  const [show, setShow] = useState(false);
+
+  // Show guide once authenticated and not yet seen
+  useEffect(() => {
+    if (isAuthenticated && !hasSeenOnboarding) {
+      // Small delay so the map has time to render underneath
+      const t = setTimeout(() => setShow(true), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [isAuthenticated, hasSeenOnboarding]);
+
+  if (!show) return null;
+
+  return (
+    <OnboardingGuide
+      onDone={() => {
+        setShow(false);
+        markOnboardingDone();
+      }}
+    />
+  );
+}
+
 export default function RootLayout() {
   const checkStoredAuth = useUserStore((s) => s.checkStoredAuth);
   const isCheckingAuth = useUserStore((s) => s.isCheckingAuth);
@@ -55,7 +83,13 @@ export default function RootLayout() {
 
   if (isCheckingAuth) {
     return (
-      <View style={{ flex: 1, backgroundColor: PALETTE.background, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: PALETTE.background,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
         <ActivityIndicator color={PALETTE.text} size="large" />
       </View>
     );
@@ -68,6 +102,13 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen
+          name="run-detail"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
           name="run-summary"
           options={{
             presentation: 'modal',
@@ -78,6 +119,7 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+      <OnboardingLayer />
       <StatusBar style="light" />
     </ThemeProvider>
   );

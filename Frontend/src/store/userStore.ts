@@ -10,6 +10,7 @@ interface UserState {
   user: ApiUser | null;
   isAuthenticated: boolean;
   isCheckingAuth: boolean;
+  hasSeenOnboarding: boolean;
 
   setUser: (user: ApiUser) => void;
   ensureUser: (preferredUsername?: string) => Promise<ApiUser>;
@@ -17,23 +18,29 @@ interface UserState {
   checkStoredAuth: () => Promise<void>;
   signIn: (userId: string, username?: string) => Promise<ApiUser>;
   signOut: () => Promise<void>;
+  markOnboardingDone: () => Promise<void>;
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isCheckingAuth: true,
+  hasSeenOnboarding: false,
 
   setUser: (user) => set({ user }),
 
   checkStoredAuth: async () => {
     try {
-      const storedId = await SecureStore.getItemAsync(USER_ID_KEY);
+      const [storedId, onboarded] = await Promise.all([
+        SecureStore.getItemAsync(USER_ID_KEY),
+        SecureStore.getItemAsync(ONBOARDED_KEY),
+      ]);
+      const hasSeenOnboarding = onboarded === 'true';
       if (storedId) {
         const { user } = await api.getUser(storedId);
-        set({ user, isAuthenticated: true, isCheckingAuth: false });
+        set({ user, isAuthenticated: true, isCheckingAuth: false, hasSeenOnboarding });
       } else {
-        set({ isCheckingAuth: false });
+        set({ isCheckingAuth: false, hasSeenOnboarding });
       }
     } catch {
       set({ isCheckingAuth: false });
@@ -43,7 +50,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   signIn: async (userId: string, username?: string) => {
     const { user } = await api.getUser(userId.length < 30 ? username ?? userId : userId);
     await SecureStore.setItemAsync(USER_ID_KEY, user.id);
-    await SecureStore.setItemAsync(ONBOARDED_KEY, 'true');
+    // Do NOT mark onboarding done here — new users should see the guide
     set({ user, isAuthenticated: true });
     return user;
   },
@@ -51,7 +58,12 @@ export const useUserStore = create<UserState>((set, get) => ({
   signOut: async () => {
     await SecureStore.deleteItemAsync(USER_ID_KEY);
     await SecureStore.deleteItemAsync(ONBOARDED_KEY);
-    set({ user: null, isAuthenticated: false });
+    set({ user: null, isAuthenticated: false, hasSeenOnboarding: false });
+  },
+
+  markOnboardingDone: async () => {
+    await SecureStore.setItemAsync(ONBOARDED_KEY, 'true');
+    set({ hasSeenOnboarding: true });
   },
 
   ensureUser: async (preferredUsername) => {

@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import MapView, { Camera, Polyline, Region } from 'react-native-maps';
 
+import { SaveRunModal } from '@/src/components/SaveRunModal';
 import { TileOverlay } from '@/src/components/TileOverlay';
 import { ActivityMode, GAME, PALETTE } from '@/src/constants/game';
 import { SOOTHING_DARK_MAP_STYLE } from '@/src/constants/mapStyle';
@@ -184,13 +185,18 @@ export default function RunScreen() {
   const [is3D, setIs3D] = useState(false);
   const [followMode, setFollowMode] = useState(true);
   const [now, setNow] = useState(Date.now());
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [stoppedRunId, setStoppedRunId] = useState<string | null>(null);
+  const lastSummary = useRunStore((s) => s.lastSummary);
+  const [zoomKey, setZoomKey] = useState(0);
+  const [isZooming, setIsZooming] = useState(false);
 
   const mapRef = useRef<MapView | null>(null);
   const followModeRef = useRef(true);
   const lastCameraUpdate = useRef(0);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const router = useRouter();
-
+  const zoomTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const splashOpacity = useRef(new Animated.Value(0)).current;
   useTilesSocket();
 
   // ── Timer ───────────────────────────────────────────────────────────────────
@@ -272,6 +278,73 @@ export default function RunScreen() {
     mapRef.current?.animateCamera(camera, { duration: 1200 });
   }, [path, phase, is3D]);
 
+  // ── Earth zoom on tab focus ──────────────────────────────────────────────────
+
+  useFocusEffect(
+    useCallback(() => {
+      if (phase === 'idle') {
+        setZoomKey((k) => k + 1);
+      }
+    }, [phase]),
+  );
+
+  useEffect(() => {
+    if (zoomKey === 0 || !region || !mapRef.current) return;
+
+    zoomTimersRef.current.forEach(clearTimeout);
+    zoomTimersRef.current = [];
+
+    setIsZooming(true);
+
+    // Instantly jump to a whole-Earth view (hidden behind splash)
+    splashOpacity.setValue(1);
+    mapRef.current.animateCamera(
+      {
+        center: { latitude: region.latitude, longitude: region.longitude },
+        altitude: 12_000_000,
+        zoom: 1,
+        pitch: 0,
+        heading: 0,
+      },
+      { duration: 0 },
+    );
+
+    // Fade out splash revealing Earth, begin pull-in to continent level
+    const t1 = setTimeout(() => {
+      Animated.timing(splashOpacity, { toValue: 0, duration: 700, useNativeDriver: true }).start();
+      mapRef.current?.animateCamera(
+        {
+          center: { latitude: region.latitude, longitude: region.longitude },
+          altitude: 180_000,
+          zoom: 8,
+          pitch: 0,
+          heading: 0,
+        },
+        { duration: 2000 },
+      );
+    }, 200);
+
+    // Final dive to street level
+    const t2 = setTimeout(() => {
+      mapRef.current?.animateCamera(
+        {
+          center: { latitude: region.latitude, longitude: region.longitude },
+          altitude: 300,
+          zoom: MAP_FOLLOW_ZOOM,
+          pitch: 0,
+          heading: 0,
+        },
+        { duration: 1600 },
+      );
+    }, 2300);
+
+    // Restore normal map type
+    const t3 = setTimeout(() => setIsZooming(false), 4100);
+
+    zoomTimersRef.current = [t1, t2, t3];
+    return () => zoomTimersRef.current.forEach(clearTimeout);
+  }, [zoomKey, region, splashOpacity]);
+
   // ── Tile fetching ───────────────────────────────────────────────────────────
 
   const fetchVisibleTiles = useCallback(
@@ -325,8 +398,10 @@ export default function RunScreen() {
   // ── Actions ─────────────────────────────────────────────────────────────────
 
   const handleStop = async () => {
+    const currentRunId = useRunStore.getState().runId;
+    setStoppedRunId(currentRunId);
     await stop();
-    router.push('/run-summary');
+    setSaveModalVisible(true);
   };
 
   const toggle3D = () => {
@@ -369,9 +444,11 @@ export default function RunScreen() {
           customMapStyle={Platform.OS === 'android' ? SOOTHING_DARK_MAP_STYLE : undefined}
           mapType={
             Platform.OS === 'ios'
-              ? is3D && isRunning
-                ? 'hybridFlyover'
-                : 'mutedStandard'
+              ? isZooming
+                ? 'satellite'
+                : is3D && isRunning
+                  ? 'hybridFlyover'
+                  : 'mutedStandard'
               : 'standard'
           }
           showsUserLocation={permission === 'granted'}
@@ -400,6 +477,13 @@ export default function RunScreen() {
           <Text style={styles.loadingText}>Finding your location…</Text>
         </View>
       )}
+
+      {/* Earth-zoom splash — covers map during the instant camera jump */}
+      <Animated.View
+        style={[styles.zoomSplash, { opacity: splashOpacity }]}
+        pointerEvents="none">
+        <Text style={styles.zoomSplashLabel}>TERRITORY</Text>
+      </Animated.View>
 
       {/* Map controls — top right */}
       <View style={styles.mapControls} pointerEvents="box-none">
@@ -562,6 +646,15 @@ export default function RunScreen() {
           </View>
         )}
       </View>
+
+      {/* Save run modal — rendered outside the sheet so it covers everything */}
+      <SaveRunModal
+        visible={saveModalVisible}
+        summary={lastSummary}
+        runId={stoppedRunId}
+        mode={mode}
+        onDone={() => setSaveModalVisible(false)}
+      />
     </View>
   );
 }
@@ -841,4 +934,19 @@ const styles = StyleSheet.create({
   segLabel: { fontSize: 14, fontWeight: '600', letterSpacing: 0.2 },
   segLabelActive: { color: '#000' },
   segLabelInactive: { color: PALETTE.textDim },
+
+  // Earth-zoom splash
+  zoomSplash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: PALETTE.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+  },
+  zoomSplashLabel: {
+    color: PALETTE.textDim,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 7,
+  },
 });

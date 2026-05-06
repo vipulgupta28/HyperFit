@@ -346,6 +346,7 @@ export default function MapScreen() {
           tile={selectedTile}
           meUserId={user?.id}
           onClose={dismissTileInfo}
+          bottomInset={74}
         />
       )}
     </View>

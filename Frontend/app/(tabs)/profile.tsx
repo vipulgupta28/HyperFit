@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,6 +15,8 @@ import {
 
 import { PALETTE } from '@/src/constants/game';
 import { ApiRun, ApiUser, api } from '@/src/services/api';
+import { useRunMetaStore } from '@/src/store/runMetaStore';
+import { useRunsStore } from '@/src/store/runsStore';
 import { useUserStore } from '@/src/store/userStore';
 import { formatDistance, formatDuration } from '@/src/utils/geo';
 
@@ -125,11 +127,17 @@ const levelStyles = StyleSheet.create({
   barFill: { height: '100%', borderRadius: 2 },
 });
 
-function RunCard({ run }: { run: ApiRun }) {
+function RunCard({ run, onPress }: { run: ApiRun; onPress: () => void }) {
   const isRun = run.mode === 'run';
+  const meta = useRunMetaStore((s) => s.get(run.id));
+  const modeColor = isRun ? PALETTE.runPrimary : PALETTE.walkPrimary;
+
   return (
-    <View style={runCardStyles.card}>
+    <Pressable style={runCardStyles.card} onPress={onPress}>
       <View style={runCardStyles.left}>
+        <Text style={runCardStyles.name} numberOfLines={1}>
+          {meta?.name ?? (isRun ? 'Run' : 'Walk')}
+        </Text>
         <Text style={runCardStyles.distance}>{formatDistance(run.distance)}</Text>
         <View style={runCardStyles.meta}>
           <Text style={runCardStyles.metaText}>{formatDuration(run.duration)}</Text>
@@ -139,11 +147,7 @@ function RunCard({ run }: { run: ApiRun }) {
             <>
               <Text style={runCardStyles.dot}>·</Text>
               <View style={[runCardStyles.modeChip, isRun && runCardStyles.runChip]}>
-                <Ionicons
-                  name={isRun ? 'flash' : 'walk'}
-                  size={10}
-                  color={isRun ? PALETTE.runPrimary : PALETTE.walkPrimary}
-                />
+                <Ionicons name={isRun ? 'flash' : 'walk'} size={10} color={modeColor} />
                 <Text style={[runCardStyles.modeTag, isRun && runCardStyles.runTag]}>
                   {run.mode}
                 </Text>
@@ -152,10 +156,13 @@ function RunCard({ run }: { run: ApiRun }) {
           )}
         </View>
       </View>
-      <Text style={runCardStyles.date}>
-        {new Date(run.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-      </Text>
-    </View>
+      <View style={runCardStyles.right}>
+        <Text style={runCardStyles.date}>
+          {new Date(run.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+        </Text>
+        <Ionicons name="chevron-forward" size={14} color={PALETTE.textDim} style={{ marginTop: 4 }} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -172,8 +179,10 @@ const runCardStyles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: PALETTE.border,
   },
-  left: { gap: 4 },
-  distance: { color: PALETTE.text, fontWeight: '700', fontSize: 18 },
+  left: { gap: 3, flex: 1 },
+  right: { alignItems: 'flex-end', gap: 2 },
+  name: { color: PALETTE.text, fontWeight: '600', fontSize: 14 },
+  distance: { color: PALETTE.text, fontWeight: '700', fontSize: 20 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { color: PALETTE.textMuted, fontSize: 13 },
   dot: { color: PALETTE.textDim, fontSize: 13 },
@@ -278,6 +287,8 @@ export default function ProfileScreen() {
   const setUser = useUserStore((s) => s.setUser);
   const user = useUserStore((s) => s.user);
   const signOut = useUserStore((s) => s.signOut);
+  const setRuns = useRunsStore((s) => s.setRuns);
+  const router = useRouter();
 
   const [recentRuns, setRecentRuns] = useState<ApiRun[]>([]);
   const [leaderboard, setLeaderboard] = useState<ApiUser[]>([]);
@@ -294,6 +305,7 @@ export default function ProfileScreen() {
     ]);
     setUser(fresh);
     setRecentRuns(runs);
+    setRuns(runs);
     setLeaderboard(users);
   }, [ensureUser, setUser]);
 
@@ -380,7 +392,12 @@ export default function ProfileScreen() {
           }
           data={recentRuns}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <RunCard run={item} />}
+          renderItem={({ item }) => (
+            <RunCard
+              run={item}
+              onPress={() => router.push({ pathname: '/run-detail', params: { runId: item.id } })}
+            />
+          )}
           ListFooterComponent={
             <>
               <SectionTitle title="Leaderboard" />
