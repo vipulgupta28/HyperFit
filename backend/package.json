@@ -1,0 +1,28 @@
+{
+  "name": "territory-run-backend",
+  "version": "1.0.0",
+  "description": "Backend for Territory Run — a GPS territory-capture game.",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --watch src --ext ts,json --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.6.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "h3-js": "^4.4.0",
+    "socket.io": "^4.7.5",
+    "uuid": "^10.0.0"
+  }
+}
