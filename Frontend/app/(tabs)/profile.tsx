@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { PALETTE } from '@/src/constants/game';
-import { ApiRun, ApiUser, api } from '@/src/services/api';
+import { ApiRun, api } from '@/src/services/api';
 import { useRunMetaStore } from '@/src/store/runMetaStore';
 import { useRunsStore } from '@/src/store/runsStore';
 import { useUserStore } from '@/src/store/userStore';
@@ -201,69 +201,6 @@ const runCardStyles = StyleSheet.create({
   date: { color: PALETTE.textDim, fontSize: 12 },
 });
 
-const MEDAL_COLORS = ['#F59E0B', '#9CA3AF', '#CD7C39'];
-
-function LeaderRow({ row, rank, isMe }: { row: ApiUser; rank: number; isMe: boolean }) {
-  const isTop3 = rank <= 3;
-  return (
-    <View style={[leaderStyles.row, isMe && leaderStyles.rowMe]}>
-      {isTop3 ? (
-        <View style={[leaderStyles.medalWrap, { borderColor: MEDAL_COLORS[rank - 1] + '60' }]}>
-          <Ionicons name="trophy" size={13} color={MEDAL_COLORS[rank - 1]} />
-        </View>
-      ) : (
-        <Text style={leaderStyles.rank}>#{rank}</Text>
-      )}
-      <View style={[leaderStyles.dot, { backgroundColor: row.color }]} />
-      <Text style={leaderStyles.name} numberOfLines={1}>{row.username}</Text>
-      <View style={leaderStyles.stats}>
-        <Text style={leaderStyles.tiles}>{row.territoryCount}</Text>
-        <Text style={leaderStyles.tilesLabel}>tiles</Text>
-      </View>
-    </View>
-  );
-}
-
-const leaderStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    backgroundColor: PALETTE.surfaceCard,
-    borderRadius: 14,
-    marginBottom: 6,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PALETTE.border,
-  },
-  rowMe: {
-    borderColor: PALETTE.borderLight,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  medalWrap: {
-    width: 34,
-    height: 28,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  rank: {
-    color: PALETTE.textDim,
-    fontWeight: '700',
-    width: 34,
-    fontSize: 13,
-    letterSpacing: 0.3,
-  },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  name: { color: PALETTE.text, flex: 1, fontWeight: '600', fontSize: 15 },
-  stats: { flexDirection: 'row', alignItems: 'baseline', gap: 3 },
-  tiles: { color: PALETTE.text, fontWeight: '700', fontSize: 15 },
-  tilesLabel: { color: PALETTE.textDim, fontSize: 11 },
-});
-
 // ── Section title ─────────────────────────────────────────────────────────
 
 function SectionTitle({ title }: { title: string }) {
@@ -291,7 +228,6 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   const [recentRuns, setRecentRuns] = useState<ApiRun[]>([]);
-  const [leaderboard, setLeaderboard] = useState<ApiUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -299,15 +235,11 @@ export default function ProfileScreen() {
 
   const load = useCallback(async () => {
     const u = useUserStore.getState().user ?? (await ensureUser());
-    const [{ user: fresh, recentRuns: runs }, { users }] = await Promise.all([
-      api.getUser(u.id),
-      api.getLeaderboard(),
-    ]);
+    const { user: fresh, recentRuns: runs } = await api.getUser(u.id);
     setUser(fresh);
     setRecentRuns(runs);
     setRuns(runs);
-    setLeaderboard(users);
-  }, [ensureUser, setUser]);
+  }, [ensureUser, setUser, setRuns]);
 
   useEffect(() => {
     setLoading(true);
@@ -399,18 +331,7 @@ export default function ProfileScreen() {
             />
           )}
           ListFooterComponent={
-            <>
-              <SectionTitle title="Leaderboard" />
-              {leaderboard.map((row, idx) => (
-                <LeaderRow
-                  key={row.id}
-                  row={row}
-                  rank={idx + 1}
-                  isMe={row.id === user.id}
-                />
-              ))}
-              <View style={{ height: 40 }} />
-            </>
+            <View style={{ height: 40 }} />
           }
           refreshControl={
             <RefreshControl

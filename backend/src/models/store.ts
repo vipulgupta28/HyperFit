@@ -1,4 +1,4 @@
-import { Run, Tile, User } from './types';
+import { Comment, Post, Run, Tile, User } from './types';
 
 /**
  * Process-local in-memory store. Designed to be swapped for MongoDB later —
@@ -8,6 +8,8 @@ class MemoryStore {
   private users = new Map<string, User>();
   private runs = new Map<string, Run>();
   private tiles = new Map<string, Tile>();
+  private posts = new Map<string, Post>();
+  private comments = new Map<string, Comment>();
 
   // Users
   saveUser(user: User): User {
@@ -45,6 +47,35 @@ class MemoryStore {
   }
   listTiles(): Tile[] {
     return [...this.tiles.values()];
+  }
+
+  // Posts
+  savePost(post: Post): Post {
+    this.posts.set(post.id, post);
+    return post;
+  }
+  getPost(id: string): Post | undefined {
+    return this.posts.get(id);
+  }
+  listPosts(): Post[] {
+    return [...this.posts.values()].sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  // Comments
+  saveComment(comment: Comment): Comment {
+    this.comments.set(comment.id, comment);
+    return comment;
+  }
+  getComment(id: string): Comment | undefined {
+    return this.comments.get(id);
+  }
+  listComments(postId: string): Comment[] {
+    return [...this.comments.values()]
+      .filter((c) => c.postId === postId)
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }
+  deleteComment(id: string): void {
+    this.comments.delete(id);
   }
 }
 

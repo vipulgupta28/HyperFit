@@ -109,6 +109,13 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="post-detail"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
           name="run-summary"
           options={{
             presentation: 'modal',

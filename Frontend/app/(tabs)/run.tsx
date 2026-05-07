@@ -482,7 +482,7 @@ export default function RunScreen() {
       <Animated.View
         style={[styles.zoomSplash, { opacity: splashOpacity }]}
         pointerEvents="none">
-        <Text style={styles.zoomSplashLabel}>TERRITORY</Text>
+        <Text style={styles.zoomSplashLabel}>HYPERFIT</Text>
       </Animated.View>
 
       {/* Map controls — top right */}
@@ -528,7 +528,7 @@ export default function RunScreen() {
         {phase === 'idle' && (
           <View style={styles.idleContent}>
             <View style={styles.idleHeader}>
-              <Text style={styles.idleTitle}>TERRITORY</Text>
+              <Text style={styles.idleTitle}>HYPERFIT</Text>
               <View style={[styles.modePill, { borderColor: modeAccent + '60' }]}>
                 <View style={[styles.modeDot, { backgroundColor: modeAccent }]} />
                 <Text style={[styles.modeText, { color: modeAccent }]}>
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 52,
-    borderRadius: 16,
+    borderRadius: 100,
     shadowOpacity: 0.3,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },

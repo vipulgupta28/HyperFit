@@ -23,6 +23,12 @@ import { useTilesStore } from '@/src/store/tilesStore';
 import { useUserStore } from '@/src/store/userStore';
 import { boundaryOverlapsViewport } from '@/src/utils/geo';
 
+const MAP_STYLE_OPTIONS = [
+  { key: 'standard',  label: 'Map',       icon: 'map-outline'    },
+  { key: 'satellite', label: 'Satellite', icon: 'globe-outline'  },
+  { key: 'hybrid',    label: 'Hybrid',    icon: 'layers-outline' },
+] as const;
+
 const FALLBACK_REGION: Region = {
   latitude: 37.7749,
   longitude: -122.4194,
@@ -55,6 +61,8 @@ export default function MapScreen() {
   const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
   const [is3D, setIs3D] = useState(false);
   const [followMode, setFollowMode] = useState(true);
+  const [mapStyleMode, setMapStyleMode] = useState<'standard' | 'satellite' | 'hybrid'>('standard');
+  const [showStylePicker, setShowStylePicker] = useState(false);
 
   const router = useRouter();
   const hudFadeAnim = useRef(new Animated.Value(0)).current;
@@ -238,11 +246,13 @@ export default function MapScreen() {
         style={StyleSheet.absoluteFillObject}
         initialRegion={region}
         userInterfaceStyle="dark"
-        customMapStyle={Platform.OS === 'android' ? SOOTHING_DARK_MAP_STYLE : undefined}
+        customMapStyle={Platform.OS === 'android' && mapStyleMode === 'standard' ? SOOTHING_DARK_MAP_STYLE : undefined}
         mapType={
-          Platform.OS === 'ios'
-            ? is3D && phase === 'active' ? 'hybridFlyover' : 'mutedStandard'
-            : 'standard'
+          mapStyleMode === 'satellite' ? 'satellite'
+            : mapStyleMode === 'hybrid' ? 'hybrid'
+            : Platform.OS === 'ios'
+              ? is3D && phase === 'active' ? 'hybridFlyover' : 'mutedStandard'
+              : 'standard'
         }
         showsUserLocation={permission === 'granted'}
         showsMyLocationButton={false}
@@ -303,6 +313,27 @@ export default function MapScreen() {
           <Pressable style={styles.mapControlBtn} onPress={handleRecenter}>
             <Ionicons name="locate-outline" size={18} color={PALETTE.text} />
           </Pressable>
+        )}
+        <Pressable
+          style={[styles.mapControlBtn, showStylePicker && styles.mapControlBtnActive]}
+          onPress={() => setShowStylePicker((v) => !v)}>
+          <Ionicons name="layers-outline" size={18} color={showStylePicker ? PALETTE.text : PALETTE.textDim} />
+        </Pressable>
+        {showStylePicker && (
+          <View style={styles.stylePicker}>
+            {MAP_STYLE_OPTIONS.map(({ key, label, icon }) => {
+              const active = mapStyleMode === key;
+              return (
+                <Pressable
+                  key={key}
+                  style={[styles.stylePickerItem, active && styles.stylePickerItemActive]}
+                  onPress={() => { setMapStyleMode(key as typeof mapStyleMode); setShowStylePicker(false); }}>
+                  <Ionicons name={icon as never} size={13} color={active ? '#000' : PALETTE.textMuted} />
+                  <Text style={[styles.stylePickerText, active && styles.stylePickerTextActive]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         )}
       </View>
 
@@ -425,6 +456,7 @@ const styles = StyleSheet.create({
     top: 128,
     right: 16,
     gap: 8,
+    alignItems: 'flex-end',
   },
   mapControlBtn: {
     width: 44,
@@ -508,5 +540,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     flex: 1,
+  },
+
+  // Map style picker
+  stylePicker: {
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.borderLight,
+    overflow: 'hidden',
+    width: 130,
+  },
+  stylePickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  stylePickerItemActive: {
+    backgroundColor: '#fff',
+  },
+  stylePickerText: {
+    color: PALETTE.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  stylePickerTextActive: {
+    color: '#000',
   },
 });

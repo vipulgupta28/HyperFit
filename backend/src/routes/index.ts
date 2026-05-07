@@ -5,6 +5,15 @@ import {
   postRunStart,
   postRunUpdate,
 } from '../controllers/runs.controller';
+import {
+  addComment,
+  createPost,
+  deleteComment,
+  getFeed,
+  getComments,
+  getPostHandler,
+  toggleLike,
+} from '../controllers/feed.controller';
 import { getTiles } from '../controllers/tiles.controller';
 import {
   getLeaderboardHandler,
@@ -25,3 +34,12 @@ router.get('/tiles', getTiles);
 
 router.get('/leaderboard', getLeaderboardHandler);
 router.get('/users/:id', getUserHandler);
+
+// Feed & social
+router.get('/feed', getFeed);
+router.post('/posts', createPost);
+router.get('/posts/:postId', getPostHandler);
+router.post('/posts/:postId/like', toggleLike);
+router.get('/posts/:postId/comments', getComments);
+router.post('/posts/:postId/comments', addComment);
+router.delete('/posts/:postId/comments/:commentId', deleteComment);

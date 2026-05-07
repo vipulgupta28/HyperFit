@@ -18,7 +18,7 @@ export default function TabLayout() {
           backgroundColor: PALETTE.background,
           borderTopColor: PALETTE.border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: 60,
+          height: 70,
         },
         tabBarLabelStyle: {
           fontWeight: '600',
@@ -54,6 +54,15 @@ export default function TabLayout() {
           title: 'Ranks',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'trophy' : 'trophy-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="feed"
+        options={{
+          title: 'Feed',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'newspaper' : 'newspaper-outline'} size={22} color={color} />
           ),
         }}
       />

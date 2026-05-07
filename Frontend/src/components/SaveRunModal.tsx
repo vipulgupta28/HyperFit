@@ -1,19 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
 
 import { PALETTE } from '../constants/game';
-import { ApiRunSummary } from '../services/api';
+import { ApiRunSummary, api } from '../services/api';
 import { useRunMetaStore } from '../store/runMetaStore';
+import { useRunStore } from '../store/runStore';
+import { useUserStore } from '../store/userStore';
 import { formatDistance, formatDuration } from '../utils/geo';
 
 interface SaveRunModalProps {
@@ -26,20 +32,27 @@ interface SaveRunModalProps {
 
 export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunModalProps) {
   const saveMeta = useRunMetaStore((s) => s.save);
+  const path = useRunStore((s) => s.path);
+  const user = useUserStore((s) => s.user);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [shareToFeed, setShareToFeed] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(500)).current;
 
-  // Set default name from mode + date
   useEffect(() => {
     if (visible) {
       const now = new Date();
       const dateStr = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       setName(`${mode === 'walk' ? 'Walk' : 'Run'} – ${dateStr}`);
       setDescription('');
+      setImageUri(null);
+      setShareToFeed(false);
+      setSharing(false);
 
       Animated.parallel([
         Animated.timing(backdropOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
@@ -48,10 +61,59 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
     }
   }, [visible, mode, backdropOpacity, slideAnim]);
 
-  const dismiss = (save: boolean) => {
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images' as ImagePicker.MediaType,
+      allowsEditing: true,
+      aspect: [4, 3] as [number, number],
+      quality: 0.6,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      setImageUri(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      setShareToFeed(true);
+    }
+  };
+
+  const dismiss = async (save: boolean) => {
     if (save && runId && name.trim()) {
       saveMeta(runId, name.trim(), description.trim());
+
+      if (shareToFeed && user) {
+        setSharing(true);
+        try {
+          const simplePath = path
+            .filter((_, i) => i % 4 === 0)
+            .map((p) => ({ lat: p.lat, lng: p.lng }));
+          const distM = summary?.distance ?? 0;
+          const durMs = summary?.duration ?? 0;
+          const pace = durMs > 0 && distM > 0 ? durMs / 1000 / (distM / 1000) : 0;
+
+          await api.createPost({
+            userId: user.id,
+            username: user.username,
+            userColor: user.color,
+            runId,
+            imageUri,
+            description: description.trim(),
+            distance: distM,
+            duration: Math.round(durMs / 1000),
+            pace,
+            mode,
+            path: simplePath,
+          });
+        } catch {
+          // non-fatal
+        } finally {
+          setSharing(false);
+        }
+      }
     }
+
     Animated.parallel([
       Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 500, duration: 220, useNativeDriver: true }),
@@ -73,76 +135,133 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
         style={styles.kbWrap}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
-          {/* Handle */}
           <View style={styles.handle} />
 
-          {/* Header */}
-          <View style={styles.titleRow}>
-            <View style={[styles.modeDot, { backgroundColor: accentColor }]} />
-            <Text style={styles.title}>Save Activity?</Text>
-          </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}>
 
-          {/* Stats summary */}
-          <View style={styles.statsRow}>
-            <StatChip
-              icon="navigate-outline"
-              value={formatDistance(distance)}
-              label="Distance"
-              color={accentColor}
+            {/* Header */}
+            <View style={styles.titleRow}>
+              <View style={[styles.modeDot, { backgroundColor: accentColor }]} />
+              <Text style={styles.title}>Save Activity</Text>
+            </View>
+
+            {/* Stats chips */}
+            <View style={styles.statsRow}>
+              <StatChip icon="navigate-outline" value={formatDistance(distance)} label="Distance" color={accentColor} />
+              <StatChip icon="time-outline" value={formatDuration(duration)} label="Duration" color={PALETTE.textMuted} />
+              <StatChip icon="map-outline" value={String(tiles)} label="Tiles" color={PALETTE.textMuted} />
+            </View>
+
+            {/* Name */}
+            <Text style={styles.fieldLabel}>ACTIVITY NAME</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Give this run a name…"
+              placeholderTextColor={PALETTE.textDim}
+              selectionColor={accentColor}
+              returnKeyType="next"
+              maxLength={60}
             />
-            <StatChip
-              icon="time-outline"
-              value={formatDuration(duration)}
-              label="Duration"
-              color={PALETTE.textMuted}
+
+            {/* Description */}
+            <Text style={styles.fieldLabel}>NOTE (OPTIONAL)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="How did it feel?"
+              placeholderTextColor={PALETTE.textDim}
+              selectionColor={accentColor}
+              multiline
+              numberOfLines={3}
+              maxLength={300}
+              returnKeyType="done"
             />
-            <StatChip
-              icon="map-outline"
-              value={String(tiles)}
-              label="Tiles"
-              color={PALETTE.textMuted}
-            />
-          </View>
 
-          {/* Name input */}
-          <Text style={styles.fieldLabel}>ACTIVITY NAME</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Give this run a name…"
-            placeholderTextColor={PALETTE.textDim}
-            selectionColor={accentColor}
-            returnKeyType="next"
-            maxLength={60}
-          />
+            {/* Share divider */}
+            <View style={styles.shareDivider}>
+              <View style={styles.shareDividerLine} />
+              <Text style={styles.shareDividerLabel}>SHARE TO FEED</Text>
+              <View style={styles.shareDividerLine} />
+            </View>
 
-          {/* Description input */}
-          <Text style={styles.fieldLabel}>NOTE (OPTIONAL)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="How did it feel?"
-            placeholderTextColor={PALETTE.textDim}
-            selectionColor={accentColor}
-            multiline
-            numberOfLines={3}
-            maxLength={200}
-            returnKeyType="done"
-          />
+            {/* Share toggle row */}
+            <View style={styles.shareToggleRow}>
+              <View style={styles.shareToggleLeft}>
+                <Ionicons name="newspaper-outline" size={18} color={PALETTE.textMuted} />
+                <View>
+                  <Text style={styles.shareToggleTitle}>Post to Feed</Text>
+                  <Text style={styles.shareToggleSub}>Share with the community</Text>
+                </View>
+              </View>
+              <Switch
+                value={shareToFeed}
+                onValueChange={setShareToFeed}
+                trackColor={{ false: PALETTE.surface, true: accentColor + '80' }}
+                thumbColor={shareToFeed ? accentColor : PALETTE.textDim}
+              />
+            </View>
 
-          {/* Buttons */}
-          <Pressable
-            style={[styles.saveBtn, { backgroundColor: accentColor }]}
-            onPress={() => dismiss(true)}>
-            <Ionicons name="checkmark" size={18} color="#000" style={{ marginRight: 6 }} />
-            <Text style={styles.saveBtnLabel}>Save Activity</Text>
-          </Pressable>
+            {/* Photo picker (only when sharing) */}
+            {shareToFeed && (
+              <View>
+                <Text style={styles.fieldLabel}>PHOTO (OPTIONAL)</Text>
+                {imageUri ? (
+                  <View style={styles.imagePreviewWrap}>
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.imagePreview}
+                      contentFit="cover"
+                    />
+                    <Pressable
+                      style={styles.removeImageBtn}
+                      onPress={() => setImageUri(null)}
+                      hitSlop={8}>
+                      <Ionicons name="close-circle" size={24} color="rgba(255,255,255,0.9)" />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable style={styles.photoPickerBtn} onPress={pickImage}>
+                    <Ionicons name="camera-outline" size={20} color={PALETTE.textDim} />
+                    <Text style={styles.photoPickerText}>Add a photo from your library</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
 
-          <Pressable style={styles.discardBtn} onPress={() => dismiss(false)}>
-            <Text style={styles.discardLabel}>Skip & Discard</Text>
-          </Pressable>
+            {/* Save button */}
+            <Pressable
+              style={[
+                styles.saveBtn,
+                { backgroundColor: accentColor },
+                sharing && styles.saveBtnDisabled,
+              ]}
+              onPress={() => dismiss(true)}
+              disabled={sharing}>
+              <Ionicons
+                name={sharing ? 'cloud-upload-outline' : shareToFeed ? 'share-social-outline' : 'checkmark'}
+                size={18}
+                color="#000"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.saveBtnLabel}>
+                {sharing ? 'Sharing…' : shareToFeed ? 'Save & Share' : 'Save Activity'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.discardBtn}
+              onPress={() => dismiss(false)}
+              disabled={sharing}>
+              <Text style={styles.discardLabel}>Skip & Discard</Text>
+            </Pressable>
+          </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
     </>
@@ -196,6 +315,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 51,
+    maxHeight: '92%',
   },
   sheet: {
     backgroundColor: 'rgba(10,10,10,0.99)',
@@ -203,8 +323,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: PALETTE.border,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     shadowColor: '#000',
     shadowOpacity: 0.9,
     shadowRadius: 40,
@@ -218,8 +336,13 @@ const styles = StyleSheet.create({
     backgroundColor: PALETTE.border,
     alignSelf: 'center',
     marginTop: 10,
-    marginBottom: 20,
   },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -258,6 +381,79 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 
+  // Share section
+  shareDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  shareDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: PALETTE.border,
+  },
+  shareDividerLabel: {
+    color: PALETTE.textDim,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+
+  shareToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: PALETTE.surface,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PALETTE.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  shareToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  shareToggleTitle: { color: PALETTE.text, fontSize: 15, fontWeight: '600' },
+  shareToggleSub: { color: PALETTE.textDim, fontSize: 11, marginTop: 1 },
+
+  // Photo picker
+  photoPickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 76,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: PALETTE.borderLight,
+    marginBottom: 16,
+  },
+  photoPickerText: { color: PALETTE.textDim, fontSize: 14, fontWeight: '500' },
+
+  imagePreviewWrap: {
+    position: 'relative',
+    marginBottom: 16,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 160,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+
+  // Buttons
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -270,6 +466,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
+  saveBtnDisabled: { opacity: 0.65 },
   saveBtnLabel: { color: '#000', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
 
   discardBtn: {

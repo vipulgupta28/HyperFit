@@ -51,6 +51,35 @@ export interface ApiRunSummary {
   netTerritoryDelta: number;
 }
 
+export interface ApiPost {
+  id: string;
+  userId: string;
+  username: string;
+  userColor: string;
+  runId: string | null;
+  imageUri: string | null;
+  description: string;
+  distance: number;
+  duration: number;
+  pace: number;
+  mode: 'walk' | 'run';
+  path: { lat: number; lng: number }[];
+  likeCount: number;
+  likedBy: string[];
+  commentCount: number;
+  createdAt: number;
+}
+
+export interface ApiComment {
+  id: string;
+  postId: string;
+  userId: string;
+  username: string;
+  userColor: string;
+  text: string;
+  createdAt: number;
+}
+
 let cached: AxiosInstance | null = null;
 
 function client(): AxiosInstance {
@@ -102,5 +131,53 @@ export const api = {
   getLeaderboard: async (): Promise<{ users: ApiUser[] }> => {
     const { data } = await client().get('/leaderboard');
     return data;
+  },
+
+  getFeed: async (cursor?: string, limit = 20): Promise<{ posts: ApiPost[]; nextCursor: string | null }> => {
+    const params: Record<string, string | number> = { limit };
+    if (cursor) params.cursor = cursor;
+    const { data } = await client().get('/feed', { params });
+    return data;
+  },
+
+  getPost: async (postId: string): Promise<{ post: ApiPost }> => {
+    const { data } = await client().get(`/posts/${postId}`);
+    return data;
+  },
+
+  createPost: async (payload: {
+    userId: string;
+    username: string;
+    userColor: string;
+    runId?: string | null;
+    imageUri?: string | null;
+    description: string;
+    distance: number;
+    duration: number;
+    pace: number;
+    mode: 'walk' | 'run';
+    path: { lat: number; lng: number }[];
+  }): Promise<{ post: ApiPost }> => {
+    const { data } = await client().post('/posts', payload);
+    return data;
+  },
+
+  toggleLike: async (postId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> => {
+    const { data } = await client().post(`/posts/${postId}/like`, { userId });
+    return data;
+  },
+
+  getComments: async (postId: string): Promise<{ comments: ApiComment[] }> => {
+    const { data } = await client().get(`/posts/${postId}/comments`);
+    return data;
+  },
+
+  addComment: async (postId: string, userId: string, username: string, userColor: string, text: string): Promise<{ comment: ApiComment }> => {
+    const { data } = await client().post(`/posts/${postId}/comments`, { userId, username, userColor, text });
+    return data;
+  },
+
+  deleteComment: async (postId: string, commentId: string, userId: string): Promise<void> => {
+    await client().delete(`/posts/${postId}/comments/${commentId}`, { data: { userId } });
   },
 };

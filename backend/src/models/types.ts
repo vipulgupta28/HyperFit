@@ -69,3 +69,31 @@ export interface RunSummary {
   capturedTiles: WireTile[];
   netTerritoryDelta: number;
 }
+
+export interface Post {
+  id: string;
+  userId: string;
+  username: string;
+  userColor: string;
+  runId: string | null;
+  imageUri: string | null;
+  description: string;
+  distance: number;
+  duration: number;
+  pace: number;
+  mode: ActivityMode;
+  path: { lat: number; lng: number }[];
+  likedBy: string[];
+  commentCount: number;
+  createdAt: number;
+}
+
+export interface Comment {
+  id: string;
+  postId: string;
+  userId: string;
+  username: string;
+  userColor: string;
+  text: string;
+  createdAt: number;
+}
