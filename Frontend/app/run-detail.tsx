@@ -7,9 +7,9 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 import MapView, { Polyline } from 'react-native-maps';
 
 import { PALETTE } from '@/src/constants/game';

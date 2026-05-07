@@ -7,9 +7,9 @@ import {
   RefreshControl,
   SafeAreaView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
 import { PostCard } from '@/src/components/PostCard';
 import { PALETTE } from '@/src/constants/game';

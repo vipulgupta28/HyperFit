@@ -5,9 +5,9 @@ import {
   Animated,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from './Text';
 
 import { PALETTE } from '../constants/game';
 import { ApiTile, api } from '../services/api';

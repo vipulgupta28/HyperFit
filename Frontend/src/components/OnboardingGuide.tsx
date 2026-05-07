@@ -6,9 +6,9 @@ import {
   Dimensions,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from './Text';
 
 import { PALETTE } from '../constants/game';
 

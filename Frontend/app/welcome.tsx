@@ -13,9 +13,9 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PALETTE } from '@/src/constants/game';

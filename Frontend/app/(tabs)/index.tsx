@@ -7,9 +7,9 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 import MapView, { Camera, Polyline, Region } from 'react-native-maps';
 
 import { TileInfoPopup } from '@/src/components/TileInfoPopup';

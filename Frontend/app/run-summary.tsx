@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/src/components/Text';
 
 import { StatPill } from '@/src/components/StatPill';
 import { PALETTE } from '@/src/constants/game';

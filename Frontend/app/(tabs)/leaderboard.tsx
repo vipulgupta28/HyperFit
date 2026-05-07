@@ -9,9 +9,9 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
 import { PALETTE } from '@/src/constants/game';
 import { ApiUser, api } from '@/src/services/api';

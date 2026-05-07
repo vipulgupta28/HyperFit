@@ -10,10 +10,10 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import { Text } from './Text';
 
 import { PALETTE } from '../constants/game';
 import { ApiRunSummary, api } from '../services/api';
@@ -413,6 +413,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: PALETTE.border,
     color: PALETTE.text,
+    fontFamily: 'Poppins_400Regular',
     fontSize: 15,
     paddingHorizontal: 14,
     paddingVertical: 12,

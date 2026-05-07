@@ -12,10 +12,10 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 import MapView, { Polyline } from 'react-native-maps';
@@ -578,6 +578,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: PALETTE.border,
     color: PALETTE.text,
+    fontFamily: 'Poppins_400Regular',
     fontSize: 14,
     paddingHorizontal: 14,
     paddingVertical: 9,

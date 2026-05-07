@@ -60,7 +60,8 @@
           "locationAlwaysAndWhenInUsePermission": "Territory Run needs your location to track runs and capture tiles."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

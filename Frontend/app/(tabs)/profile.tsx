@@ -9,9 +9,9 @@ import {
   RefreshControl,
   SafeAreaView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
 import { PALETTE } from '@/src/constants/game';
 import { ApiRun, api } from '@/src/services/api';
