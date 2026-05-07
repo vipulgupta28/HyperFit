@@ -22,6 +22,7 @@ interface Step {
   icon: string;
   spotlight: { x: number; y: number; w: number; h: number };
   cardSide: 'top' | 'bottom';
+  spotlightMode?: 'cutout' | 'outline';
 }
 
 // Spotlight coords are 0–1 fractions of the screen.
@@ -41,6 +42,7 @@ const STEPS: Step[] = [
     icon: 'stats-chart',
     spotlight: { x: 0.03, y: 0.06, w: 0.94, h: 0.10 },
     cardSide: 'bottom',
+    spotlightMode: 'outline',
   },
   {
     title: 'Tap Any Tile',
@@ -55,6 +57,7 @@ const STEPS: Step[] = [
     icon: 'flash',
     spotlight: { x: 0.25, y: 0.90, w: 0.25, h: 0.10 },
     cardSide: 'top',
+    spotlightMode: 'outline',
   },
   {
     title: 'Compete on Ranks',
@@ -62,6 +65,7 @@ const STEPS: Step[] = [
     icon: 'trophy',
     spotlight: { x: 0.50, y: 0.90, w: 0.25, h: 0.10 },
     cardSide: 'top',
+    spotlightMode: 'outline',
   },
 ];
 
@@ -123,6 +127,7 @@ export function OnboardingGuide({ onDone }: OnboardingGuideProps) {
 
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
+  const isOutline = (current.spotlightMode ?? 'cutout') === 'outline';
 
   const sl = {
     x: current.spotlight.x * W,
@@ -133,48 +138,85 @@ export function OnboardingGuide({ onDone }: OnboardingGuideProps) {
 
   const CARD_MARGIN = 16;
   const CARD_HEIGHT_EST = 280;
+  const CARD_GAP = isOutline ? 50 : 20;
   const cardTop =
     current.cardSide === 'bottom'
-      ? sl.y + sl.h + 20
-      : sl.y - 20 - CARD_HEIGHT_EST;
+      ? sl.y + sl.h + CARD_GAP
+      : sl.y - CARD_GAP - CARD_HEIGHT_EST;
+
+  const cardTopClamped = Math.max(CARD_MARGIN + 60, Math.min(cardTop, H - CARD_HEIGHT_EST - CARD_MARGIN));
+  const slCenterX = sl.x + sl.w / 2;
+
+  let connTop = 0;
+  let connHeight = 0;
+  if (isOutline) {
+    if (current.cardSide === 'top') {
+      connTop = cardTopClamped + CARD_HEIGHT_EST;
+      connHeight = sl.y - connTop;
+    } else {
+      connTop = sl.y + sl.h;
+      connHeight = cardTopClamped - connTop;
+    }
+  }
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      {/* Dimmed backdrop — 4 rectangles around the spotlight */}
+      {/* Dimmed backdrop */}
       <Animated.View style={{ opacity: backdropOpacity }} pointerEvents="none">
-        <View style={[styles.dim, { top: 0, left: 0, right: 0, height: sl.y }]} />
-        <View style={[styles.dim, { top: sl.y + sl.h, left: 0, right: 0, bottom: 0 }]} />
-        <View style={[styles.dim, { top: sl.y, left: 0, width: sl.x, height: sl.h }]} />
-        <View style={[styles.dim, { top: sl.y, left: sl.x + sl.w, right: 0, height: sl.h }]} />
+        {isOutline ? (
+          <View style={[styles.dim, StyleSheet.absoluteFillObject]} />
+        ) : (
+          <>
+            <View style={[styles.dim, { top: 0, left: 0, right: 0, height: sl.y }]} />
+            <View style={[styles.dim, { top: sl.y + sl.h, left: 0, right: 0, bottom: 0 }]} />
+            <View style={[styles.dim, { top: sl.y, left: 0, width: sl.x, height: sl.h }]} />
+            <View style={[styles.dim, { top: sl.y, left: sl.x + sl.w, right: 0, height: sl.h }]} />
+          </>
+        )}
       </Animated.View>
 
-      {/* Spotlight border */}
-      <Animated.View
-        style={[styles.spotlightBorder, { opacity: spotlightOpacity, top: sl.y, left: sl.x, width: sl.w, height: sl.h }]}
-        pointerEvents="none"
-      />
-
-      {/* Corner accents */}
-      <Animated.View style={{ opacity: spotlightOpacity }} pointerEvents="none">
-        <CornerAccent top={sl.y - 2}        left={sl.x - 2}            rotate="0deg"   />
-        <CornerAccent top={sl.y - 2}        left={sl.x + sl.w - 18}    rotate="90deg"  />
-        <CornerAccent top={sl.y + sl.h - 18} left={sl.x - 2}           rotate="270deg" />
-        <CornerAccent top={sl.y + sl.h - 18} left={sl.x + sl.w - 18}   rotate="180deg" />
-      </Animated.View>
-
-      {/* Connector line from card to spotlight */}
+      {/* Spotlight highlight */}
       <Animated.View
         style={[
-          styles.arrowLine,
-          {
-            opacity: spotlightOpacity,
-            left: W / 2 - 1,
-            top: current.cardSide === 'bottom' ? sl.y + sl.h : Math.max(cardTop + CARD_HEIGHT_EST, sl.y - 24),
-            height: 20,
-          },
+          styles.spotlightBorder,
+          isOutline && styles.spotlightOutlineBorder,
+          { opacity: spotlightOpacity, top: sl.y, left: sl.x, width: sl.w, height: sl.h },
         ]}
         pointerEvents="none"
       />
+
+      {/* Corner accents — cutout mode only */}
+      {!isOutline && (
+        <Animated.View style={{ opacity: spotlightOpacity }} pointerEvents="none">
+          <CornerAccent top={sl.y - 2}         left={sl.x - 2}           rotate="0deg"   />
+          <CornerAccent top={sl.y - 2}         left={sl.x + sl.w - 18}   rotate="90deg"  />
+          <CornerAccent top={sl.y + sl.h - 18} left={sl.x - 2}           rotate="270deg" />
+          <CornerAccent top={sl.y + sl.h - 18} left={sl.x + sl.w - 18}  rotate="180deg" />
+        </Animated.View>
+      )}
+
+      {/* Connector line */}
+      {isOutline ? (
+        connHeight > 0 && (
+          <Animated.View
+            style={[styles.connectorLine, { opacity: spotlightOpacity, left: slCenterX - 1, top: connTop, height: connHeight }]}
+            pointerEvents="none"
+          />
+        )
+      ) : (
+        <Animated.View
+          style={[
+            styles.arrowLine,
+            {
+              opacity: spotlightOpacity,
+              left: W / 2 - 1,
+              top: current.cardSide === 'bottom' ? sl.y + sl.h : Math.max(cardTop + CARD_HEIGHT_EST, sl.y - 24),
+              height: 20,
+            },
+          ]}
+          pointerEvents="none"
+        />
+      )}
 
       {/* Info card */}
       <Animated.View
@@ -183,7 +225,7 @@ export function OnboardingGuide({ onDone }: OnboardingGuideProps) {
           {
             opacity: cardOpacity,
             transform: [{ scale: cardScale }],
-            top: Math.max(CARD_MARGIN + 60, Math.min(cardTop, H - CARD_HEIGHT_EST - CARD_MARGIN)),
+            top: cardTopClamped,
             left: CARD_MARGIN,
             right: CARD_MARGIN,
           },
@@ -245,6 +287,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
+  },
+  spotlightOutlineBorder: {
+    borderColor: '#fff',
+    borderWidth: 2,
+    borderRadius: 14,
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+  },
+  connectorLine: {
+    position: 'absolute',
+    width: 1.5,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
 
   corner: {

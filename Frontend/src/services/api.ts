@@ -57,7 +57,7 @@ export interface ApiPost {
   username: string;
   userColor: string;
   runId: string | null;
-  imageUri: string | null;
+  imageUris: string[];
   description: string;
   distance: number;
   duration: number;
@@ -150,7 +150,7 @@ export const api = {
     username: string;
     userColor: string;
     runId?: string | null;
-    imageUri?: string | null;
+    imageUris?: string[];
     description: string;
     distance: number;
     duration: number;

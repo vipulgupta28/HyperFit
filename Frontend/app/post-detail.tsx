@@ -4,16 +4,20 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+
+const { width: SCREEN_W } = Dimensions.get('window');
 import MapView, { Polyline } from 'react-native-maps';
 
 import { PALETTE } from '@/src/constants/game';
@@ -173,14 +177,32 @@ export default function PostDetailScreen() {
         </View>
       </View>
 
-      {/* Image */}
-      {post.imageUri && (
-        <Image
-          source={{ uri: post.imageUri }}
-          style={styles.image}
-          contentFit="cover"
-          transition={200}
-        />
+      {/* Images carousel */}
+      {post.imageUris.length > 0 && (
+        <View>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            bounces={false}>
+            {post.imageUris.map((uri, i) => (
+              <Image
+                key={i}
+                source={{ uri }}
+                style={styles.image}
+                contentFit="cover"
+                transition={200}
+              />
+            ))}
+          </ScrollView>
+          {post.imageUris.length > 1 && (
+            <View style={styles.imageDots}>
+              {post.imageUris.map((_, i) => (
+                <View key={i} style={styles.imageDot} />
+              ))}
+            </View>
+          )}
+        </View>
       )}
 
       {/* Description */}
@@ -431,9 +453,24 @@ const styles = StyleSheet.create({
   modeBadgeText: { fontSize: 11, fontWeight: '700' },
 
   image: {
-    width: '100%',
+    width: SCREEN_W,
     height: 280,
     backgroundColor: PALETTE.surface,
+  },
+  imageDots: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  imageDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.7)',
   },
 
   description: {

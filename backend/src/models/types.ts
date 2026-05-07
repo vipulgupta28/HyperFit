@@ -76,7 +76,7 @@ export interface Post {
   username: string;
   userColor: string;
   runId: string | null;
-  imageUri: string | null;
+  imageUris: string[];
   description: string;
   distance: number;
   duration: number;

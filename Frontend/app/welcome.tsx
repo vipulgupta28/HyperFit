@@ -4,6 +4,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -228,13 +229,19 @@ export default function WelcomeScreen() {
           ]}>
           {/* Apple Sign In — iOS only */}
           {Platform.OS === 'ios' && (
-            <AppleAuthentication.AppleAuthenticationButton
-              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-              cornerRadius={16}
-              style={styles.appleButton}
+            <Pressable
+              style={({ pressed }) => [
+                styles.googleButton,
+                pressed && styles.buttonPressed,
+                isLoading && loading !== 'apple' && styles.buttonDisabled,
+              ]}
               onPress={handleAppleSignIn}
-            />
+              disabled={isLoading}>
+              <Ionicons name="logo-apple" size={20} color="#000" />
+              <Text style={styles.googleButtonText}>
+                {loading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
+              </Text>
+            </Pressable>
           )}
 
           {/* Google Sign In */}
@@ -356,10 +363,6 @@ const styles = StyleSheet.create({
   authSection: {
     gap: 12,
     paddingTop: 8,
-  },
-  appleButton: {
-    width: '100%',
-    height: 56,
   },
   googleButton: {
     flexDirection: 'row',

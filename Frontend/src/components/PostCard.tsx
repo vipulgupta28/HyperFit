@@ -56,14 +56,22 @@ export function PostCard({ post, meUserId, onLike }: PostCardProps) {
         </View>
       </View>
 
-      {/* Image */}
-      {post.imageUri && (
-        <Image
-          source={{ uri: post.imageUri }}
-          style={styles.image}
-          contentFit="cover"
-          transition={200}
-        />
+      {/* Image(s) */}
+      {post.imageUris.length > 0 && (
+        <View>
+          <Image
+            source={{ uri: post.imageUris[0] }}
+            style={styles.image}
+            contentFit="cover"
+            transition={200}
+          />
+          {post.imageUris.length > 1 && (
+            <View style={styles.imageCountBadge}>
+              <Ionicons name="images-outline" size={12} color="#fff" />
+              <Text style={styles.imageCountText}>{post.imageUris.length}</Text>
+            </View>
+          )}
+        </View>
       )}
 
       {/* Description */}
@@ -166,6 +174,19 @@ const styles = StyleSheet.create({
     height: 220,
     backgroundColor: PALETTE.surface,
   },
+  imageCountBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  imageCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   // Description
   description: {

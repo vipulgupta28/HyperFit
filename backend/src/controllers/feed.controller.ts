@@ -30,7 +30,7 @@ export const getPostHandler = (req: Request, res: Response): void => {
 };
 
 export const createPost = (req: Request, res: Response): void => {
-  const { userId, username, userColor, runId, imageUri, description, distance, duration, pace, mode, path } = req.body;
+  const { userId, username, userColor, runId, imageUris, description, distance, duration, pace, mode, path } = req.body;
   if (!userId) { res.status(400).json({ error: 'userId required' }); return; }
 
   const post: Post = {
@@ -39,7 +39,7 @@ export const createPost = (req: Request, res: Response): void => {
     username: String(username || userId),
     userColor: String(userColor || '#888'),
     runId: runId ?? null,
-    imageUri: imageUri ?? null,
+    imageUris: Array.isArray(imageUris) ? imageUris : [],
     description: String(description || ''),
     distance: Number(distance) || 0,
     duration: Number(duration) || 0,

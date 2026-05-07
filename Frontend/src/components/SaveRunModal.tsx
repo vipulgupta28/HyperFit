@@ -37,9 +37,10 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [shareToFeed, setShareToFeed] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const MAX_IMAGES = 5;
 
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(500)).current;
@@ -50,7 +51,7 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
       const dateStr = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       setName(`${mode === 'walk' ? 'Walk' : 'Run'} – ${dateStr}`);
       setDescription('');
-      setImageUri(null);
+      setImages([]);
       setShareToFeed(false);
       setSharing(false);
 
@@ -61,22 +62,43 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
     }
   }, [visible, mode, backdropOpacity, slideAnim]);
 
-  const pickImage = async () => {
+  const pickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return;
-
     const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images' as ImagePicker.MediaType,
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_IMAGES - images.length,
+      quality: 0.6,
+      base64: true,
+    });
+    if (!result.canceled) {
+      const newUris = result.assets.filter((a) => a.base64).map((a) => `data:image/jpeg;base64,${a.base64!}`);
+      if (newUris.length > 0) {
+        setImages((prev) => [...prev, ...newUris].slice(0, MAX_IMAGES));
+        setShareToFeed(true);
+      }
+    }
+  };
+
+  const capturePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchCameraAsync({
       mediaTypes: 'images' as ImagePicker.MediaType,
       allowsEditing: true,
       aspect: [4, 3] as [number, number],
       quality: 0.6,
       base64: true,
     });
-
-    if (!result.canceled && result.assets[0].base64) {
-      setImageUri(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    if (!result.canceled && result.assets[0]?.base64) {
+      setImages((prev) => [...prev, `data:image/jpeg;base64,${result.assets[0].base64!}`].slice(0, MAX_IMAGES));
       setShareToFeed(true);
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const dismiss = async (save: boolean) => {
@@ -98,7 +120,7 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
             username: user.username,
             userColor: user.color,
             runId,
-            imageUri,
+            imageUris: images,
             description: description.trim(),
             distance: distM,
             duration: Math.round(durMs / 1000),
@@ -211,26 +233,46 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
             {/* Photo picker (only when sharing) */}
             {shareToFeed && (
               <View>
-                <Text style={styles.fieldLabel}>PHOTO (OPTIONAL)</Text>
-                {imageUri ? (
-                  <View style={styles.imagePreviewWrap}>
-                    <Image
-                      source={{ uri: imageUri }}
-                      style={styles.imagePreview}
-                      contentFit="cover"
-                    />
-                    <Pressable
-                      style={styles.removeImageBtn}
-                      onPress={() => setImageUri(null)}
-                      hitSlop={8}>
-                      <Ionicons name="close-circle" size={24} color="rgba(255,255,255,0.9)" />
+                <View style={styles.photoLabelRow}>
+                  <Text style={styles.fieldLabel}>PHOTOS (OPTIONAL)</Text>
+                  {images.length > 0 && (
+                    <Text style={styles.photoCount}>{images.length}/{MAX_IMAGES}</Text>
+                  )}
+                </View>
+
+                {/* Camera + Gallery buttons */}
+                {images.length < MAX_IMAGES && (
+                  <View style={styles.photoActions}>
+                    <Pressable style={styles.photoActionBtn} onPress={capturePhoto}>
+                      <Ionicons name="camera-outline" size={18} color={PALETTE.textDim} />
+                      <Text style={styles.photoActionText}>Camera</Text>
+                    </Pressable>
+                    <Pressable style={styles.photoActionBtn} onPress={pickFromGallery}>
+                      <Ionicons name="images-outline" size={18} color={PALETTE.textDim} />
+                      <Text style={styles.photoActionText}>Gallery</Text>
                     </Pressable>
                   </View>
-                ) : (
-                  <Pressable style={styles.photoPickerBtn} onPress={pickImage}>
-                    <Ionicons name="camera-outline" size={20} color={PALETTE.textDim} />
-                    <Text style={styles.photoPickerText}>Add a photo from your library</Text>
-                  </Pressable>
+                )}
+
+                {/* Thumbnails */}
+                {images.length > 0 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.thumbsScroll}
+                    contentContainerStyle={styles.thumbsContent}>
+                    {images.map((uri, i) => (
+                      <View key={i} style={styles.thumbWrap}>
+                        <Image source={{ uri }} style={styles.thumb} contentFit="cover" />
+                        <Pressable
+                          style={styles.thumbRemove}
+                          onPress={() => removeImage(i)}
+                          hitSlop={4}>
+                          <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.9)" />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </ScrollView>
                 )}
               </View>
             )}
@@ -245,7 +287,7 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
               onPress={() => dismiss(true)}
               disabled={sharing}>
               <Ionicons
-                name={sharing ? 'cloud-upload-outline' : shareToFeed ? 'share-social-outline' : 'checkmark'}
+                name={sharing ? 'cloud-upload-outline' : shareToFeed ? 'share-social-outline' : 'checkmark-circle-outline'}
                 size={18}
                 color="#000"
                 style={{ marginRight: 6 }}
@@ -422,35 +464,53 @@ const styles = StyleSheet.create({
   shareToggleTitle: { color: PALETTE.text, fontSize: 15, fontWeight: '600' },
   shareToggleSub: { color: PALETTE.textDim, fontSize: 11, marginTop: 1 },
 
-  // Photo picker
-  photoPickerBtn: {
+  // Photo section
+  photoLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  photoCount: {
+    color: PALETTE.textDim,
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  photoActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    height: 76,
+    gap: 7,
+    height: 52,
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: PALETTE.borderLight,
-    marginBottom: 16,
   },
-  photoPickerText: { color: PALETTE.textDim, fontSize: 14, fontWeight: '500' },
+  photoActionText: { color: PALETTE.textDim, fontSize: 13, fontWeight: '500' },
 
-  imagePreviewWrap: {
+  thumbsScroll: { marginBottom: 14 },
+  thumbsContent: { gap: 8, paddingRight: 4 },
+  thumbWrap: {
     position: 'relative',
-    marginBottom: 16,
-    borderRadius: 14,
+    width: 88,
+    height: 88,
+    borderRadius: 12,
     overflow: 'hidden',
+    backgroundColor: PALETTE.surface,
   },
-  imagePreview: {
-    width: '100%',
-    height: 160,
-  },
-  removeImageBtn: {
+  thumb: { width: '100%', height: '100%' },
+  thumbRemove: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 4,
+    right: 4,
   },
 
   // Buttons
