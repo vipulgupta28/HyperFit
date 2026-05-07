@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
 
 import { PALETTE } from '../constants/game';
@@ -16,58 +17,19 @@ const { width: W, height: H } = Dimensions.get('window');
 
 const ACCENT = '#fff';
 
+// Tab bar height matches _layout.tsx tabBarStyle.height
+const TAB_BAR_H = 70;
+// Number of tabs in the app (Map | Start | Ranks | Feed | Profile)
+const TAB_COUNT = 5;
+
 interface Step {
   title: string;
   body: string;
   icon: string;
-  spotlight: { x: number; y: number; w: number; h: number };
+  spotlight: { x: number; y: number; w: number; h: number }; // pixels
   cardSide: 'top' | 'bottom';
   spotlightMode?: 'cutout' | 'outline';
 }
-
-// Spotlight coords are 0–1 fractions of the screen.
-// Calibrated for a typical iPhone (390 × 844 pt) with 4-tab bottom bar.
-// Tab bar occupies roughly y=0.90–1.00; HUD card sits at y≈0.06–0.16.
-const STEPS: Step[] = [
-  {
-    title: 'Your Territory Map',
-    body: 'The map shows hexagonal tiles. Every tile you walk or run through gets claimed in your colour. Explore and expand your empire.',
-    icon: 'map',
-    spotlight: { x: 0, y: 0.05, w: 1, h: 0.72 },
-    cardSide: 'bottom',
-  },
-  {
-    title: 'Live Stats',
-    body: 'Your tile count, global rank, and total distance — always visible at a glance at the top of the map.',
-    icon: 'stats-chart',
-    spotlight: { x: 0.03, y: 0.06, w: 0.94, h: 0.10 },
-    cardSide: 'bottom',
-    spotlightMode: 'outline',
-  },
-  {
-    title: 'Tap Any Tile',
-    body: 'Tap any coloured tile to see who owns it, how strong their claim is, and when it was last updated.',
-    icon: 'finger-print',
-    spotlight: { x: 0.15, y: 0.28, w: 0.70, h: 0.32 },
-    cardSide: 'bottom',
-  },
-  {
-    title: 'Start an Activity',
-    body: 'Switch between Walk (strength +1) and Run (strength +2). Hit Start and claim territory in real time as you move.',
-    icon: 'flash',
-    spotlight: { x: 0.25, y: 0.90, w: 0.25, h: 0.10 },
-    cardSide: 'top',
-    spotlightMode: 'outline',
-  },
-  {
-    title: 'Compete on Ranks',
-    body: "Check the global leaderboard or see who's active nearby. Claim more tiles to climb the rankings.",
-    icon: 'trophy',
-    spotlight: { x: 0.50, y: 0.90, w: 0.25, h: 0.10 },
-    cardSide: 'top',
-    spotlightMode: 'outline',
-  },
-];
 
 interface OnboardingGuideProps {
   onDone: () => void;
@@ -75,11 +37,65 @@ interface OnboardingGuideProps {
 
 export function OnboardingGuide({ onDone }: OnboardingGuideProps) {
   const [step, setStep] = useState(0);
+  const insets = useSafeAreaInsets();
 
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.85)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const spotlightOpacity = useRef(new Animated.Value(0)).current;
+
+  // Derived layout values
+  const tabBarTop = H - TAB_BAR_H;
+  const tabW = W / TAB_COUNT;
+
+  // HUD card in index.tsx: position absolute, top: 56, left: 16, right: 16
+  // top:56 is relative to the screen content area which starts at insets.top
+  const hudTop = insets.top + 56;
+  const hudH = 58; // paddingVertical:12×2 + ~34pt of stat content
+
+  // Steps with pixel-accurate spotlights
+  const steps: Step[] = useMemo(() => [
+    {
+      title: 'Your Territory Map',
+      body: 'The map shows hexagonal tiles. Every tile you walk or run through gets claimed in your colour. Explore and expand your empire.',
+      icon: 'map',
+      spotlight: { x: 0, y: insets.top, w: W, h: tabBarTop - insets.top },
+      cardSide: 'bottom',
+    },
+    {
+      title: 'Live Stats',
+      body: 'Your tile count, global rank, and total distance — always visible at a glance at the top of the map.',
+      icon: 'stats-chart',
+      spotlight: { x: 16, y: hudTop -60, w: W - 32, h: hudH+3 },
+      cardSide: 'bottom',
+      spotlightMode: 'outline',
+    },
+    {
+      title: 'Tap Any Tile',
+      body: 'Tap any coloured tile to see who owns it, how strong their claim is, and when it was last updated.',
+      icon: 'finger-print',
+      spotlight: { x: W * 0.10, y: H * 0.28, w: W * 0.80, h: H * 0.26 },
+      cardSide: 'bottom',
+    },
+    {
+      // Start tab is tab index 1 (0-based: Map=0, Start=1, Ranks=2, Feed=3, Profile=4)
+      title: 'Start an Activity',
+      body: 'Switch between Walk (strength +1) and Run (strength +2). Hit Start and claim territory in real time as you move.',
+      icon: 'flash',
+      spotlight: { x: tabW * 1, y: tabBarTop, w: tabW, h: TAB_BAR_H -10},
+      cardSide: 'top',
+      spotlightMode: 'outline',
+    },
+    {
+      // Ranks tab is tab index 2
+      title: 'Compete on Ranks',
+      body: "Check the global leaderboard or see who's active nearby. Claim more tiles to climb the rankings.",
+      icon: 'trophy',
+      spotlight: { x: tabW * 2, y: tabBarTop, w: tabW, h: TAB_BAR_H-10 },
+      cardSide: 'top',
+      spotlightMode: 'outline',
+    },
+  ], [insets.top, tabBarTop, tabW, hudTop]);
 
   // Entrance animation
   useEffect(() => {
@@ -106,8 +122,8 @@ export function OnboardingGuide({ onDone }: OnboardingGuideProps) {
   };
 
   const handleNext = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step < STEPS.length - 1) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (step < steps.length - 1) {
       goTo(step + 1);
     } else {
       Animated.parallel([
@@ -125,19 +141,15 @@ export function OnboardingGuide({ onDone }: OnboardingGuideProps) {
     ]).start(onDone);
   };
 
-  const current = STEPS[step];
-  const isLast = step === STEPS.length - 1;
+  const current = steps[step];
+  const isLast = step === steps.length - 1;
   const isOutline = (current.spotlightMode ?? 'cutout') === 'outline';
 
-  const sl = {
-    x: current.spotlight.x * W,
-    y: current.spotlight.y * H,
-    w: current.spotlight.w * W,
-    h: current.spotlight.h * H,
-  };
+  // Spotlight is already in pixels
+  const sl = current.spotlight;
 
   const CARD_MARGIN = 16;
-  const CARD_HEIGHT_EST = 280;
+  const CARD_HEIGHT_EST = 260;
   const CARD_GAP = isOutline ? 50 : 20;
   const cardTop =
     current.cardSide === 'bottom'
@@ -188,10 +200,10 @@ export function OnboardingGuide({ onDone }: OnboardingGuideProps) {
       {/* Corner accents — cutout mode only */}
       {!isOutline && (
         <Animated.View style={{ opacity: spotlightOpacity }} pointerEvents="none">
-          <CornerAccent top={sl.y - 2}         left={sl.x - 2}           rotate="0deg"   />
-          <CornerAccent top={sl.y - 2}         left={sl.x + sl.w - 18}   rotate="90deg"  />
-          <CornerAccent top={sl.y + sl.h - 18} left={sl.x - 2}           rotate="270deg" />
-          <CornerAccent top={sl.y + sl.h - 18} left={sl.x + sl.w - 18}  rotate="180deg" />
+          <CornerAccent top={sl.y - 2}          left={sl.x - 2}           rotate="0deg"   />
+          <CornerAccent top={sl.y - 2}          left={sl.x + sl.w - 18}   rotate="90deg"  />
+          <CornerAccent top={sl.y + sl.h - 18}  left={sl.x - 2}           rotate="270deg" />
+          <CornerAccent top={sl.y + sl.h - 18}  left={sl.x + sl.w - 18}   rotate="180deg" />
         </Animated.View>
       )}
 
@@ -241,7 +253,7 @@ export function OnboardingGuide({ onDone }: OnboardingGuideProps) {
 
         {/* Progress dots */}
         <View style={styles.dots}>
-          {STEPS.map((_, i) => (
+          {steps.map((_, i) => (
             <View
               key={i}
               style={[styles.dot, i === step ? styles.dotActive : styles.dotInactive]}
