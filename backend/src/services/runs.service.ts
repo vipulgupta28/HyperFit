@@ -13,8 +13,8 @@ import {
 } from './tiles.service';
 import { getOrCreateUser, recomputeRanks } from './users.service';
 
-export function startRun(userId: string, mode: ActivityMode = 'run'): Run {
-  const user = getOrCreateUser(userId);
+export async function startRun(userId: string, mode: ActivityMode = 'run'): Promise<Run> {
+  const user = await getOrCreateUser(userId);
   const run: Run = {
     id: uuid(),
     userId: user.id,
@@ -40,11 +40,11 @@ export interface UpdateRunResult {
   rejected?: { reason: string };
 }
 
-export function appendRunPoints(
+export async function appendRunPoints(
   runId: string,
   batch: GpsPoint[],
-): UpdateRunResult {
-  const run = store.getRun(runId);
+): Promise<UpdateRunResult> {
+  const run = await store.getRun(runId);
   if (!run) throw new Error('run_not_found');
   if (run.status !== 'active') throw new Error('run_not_active');
 
@@ -72,7 +72,7 @@ export function appendRunPoints(
 
   if (added > 0) {
     const visits = segmentsToTileVisits(previousTail, batch);
-    const user = getOrCreateUser(run.userId);
+    const user = await getOrCreateUser(run.userId);
 
     const pending = { ...(run.tileEffortPending ?? {}) };
     for (const v of visits) {
@@ -80,7 +80,7 @@ export function appendRunPoints(
     }
 
     const { mutations: batchMutations, nextPending } =
-      consumePendingEffortIntoMutations(pending, user, run.mode ?? 'run');
+      await consumePendingEffortIntoMutations(pending, user, run.mode ?? 'run');
     run.tileEffortPending = nextPending;
 
     let acc = run.netTerritoryDeltaAccum ?? 0;
@@ -96,7 +96,7 @@ export function appendRunPoints(
     if (batchMutations.length > 0) mutations = batchMutations;
   }
 
-  store.saveRun(run);
+  await store.saveRun(run);
   return { run, acceptedPoints: added, mutations };
 }
 
@@ -106,16 +106,16 @@ export interface EndRunResult {
   mutations: TileMutation[];
 }
 
-export function endRun(runId: string): EndRunResult {
-  const run = store.getRun(runId);
+export async function endRun(runId: string): Promise<EndRunResult> {
+  const run = await store.getRun(runId);
   if (!run) throw new Error('run_not_found');
   if (run.status !== 'active') throw new Error('run_not_active');
 
-  const user = getOrCreateUser(run.userId);
+  const user = await getOrCreateUser(run.userId);
 
   const pending = { ...(run.tileEffortPending ?? {}) };
   const { mutations: flushMutations, nextPending } =
-    consumePendingEffortIntoMutations(pending, user, run.mode ?? 'run');
+    await consumePendingEffortIntoMutations(pending, user, run.mode ?? 'run');
   run.tileEffortPending = nextPending;
 
   let acc = run.netTerritoryDeltaAccum ?? 0;
@@ -133,12 +133,12 @@ export function endRun(runId: string): EndRunResult {
 
   run.status = 'ended';
   run.endedAt = Date.now();
-  store.saveRun(run);
+  await store.saveRun(run);
 
   user.totalDistance += run.distance;
-  user.territoryCount = getOwnedTileCount(user.id);
-  store.saveUser(user);
-  recomputeRanks();
+  user.territoryCount = await getOwnedTileCount(user.id);
+  await store.saveUser(user);
+  await recomputeRanks();
 
   const durationSec = Math.max(1, run.duration / 1000);
   const distanceKm = run.distance / 1000;

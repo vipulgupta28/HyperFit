@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import http from 'http';
@@ -21,11 +22,15 @@ app.use(errorHandler);
 initSocket(server, config.corsOrigin);
 
 setInterval(() => {
-  const decayed = decayAllTiles();
-  if (decayed.length > 0) emitTileUpdates(wireTilesFromCells(decayed));
+  decayAllTiles()
+    .then((decayed) => {
+      if (decayed.length > 0) emitTileUpdates(wireTilesFromCells(decayed));
+    })
+    .catch((err) => {
+      console.error('[decay] error:', err);
+    });
 }, config.decay.intervalMs);
 
 server.listen(config.port, () => {
-  // eslint-disable-next-line no-console
   console.log(`[territory-run] api listening on http://localhost:${config.port}`);
 });

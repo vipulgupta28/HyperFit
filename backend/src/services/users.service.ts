@@ -4,12 +4,12 @@ import { store } from '../models/store';
 import { User } from '../models/types';
 import { pickUserColor } from '../utils/colors';
 
-export function getOrCreateUser(idOrUsername?: string): User {
+export async function getOrCreateUser(idOrUsername?: string): Promise<User> {
   if (idOrUsername) {
-    const existing = store.getUser(idOrUsername);
-    if (existing) return existing;
+    const byId = await store.getUser(idOrUsername);
+    if (byId) return byId;
 
-    const byName = store.listUsers().find((u) => u.username === idOrUsername);
+    const byName = await store.getUserByUsername(idOrUsername);
     if (byName) return byName;
   }
 
@@ -26,15 +26,12 @@ export function getOrCreateUser(idOrUsername?: string): User {
   return store.saveUser(user);
 }
 
-export function recomputeRanks(): void {
-  const users = store.listUsers().sort((a, b) => b.territoryCount - a.territoryCount);
-  users.forEach((u, i) => store.saveUser({ ...u, rank: i + 1 }));
+export async function recomputeRanks(): Promise<void> {
+  await store.recomputeRanks();
 }
 
-export function getLeaderboard(limit = 20): User[] {
-  recomputeRanks();
-  return store
-    .listUsers()
-    .sort((a, b) => a.rank - b.rank)
-    .slice(0, limit);
+export async function getLeaderboard(limit = 20): Promise<User[]> {
+  await recomputeRanks();
+  const users = await store.listUsers();
+  return users.sort((a, b) => a.rank - b.rank).slice(0, limit);
 }

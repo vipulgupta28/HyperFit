@@ -8,7 +8,7 @@ import { wireTilesFromCells } from '../utils/h3Geo';
  * GET /tiles?bbox=minLng,minLat,maxLng,maxLat
  * Order matches the Mapbox/MVT convention.
  */
-export function getTiles(req: Request, res: Response): void {
+export async function getTiles(req: Request, res: Response): Promise<void> {
   const bboxParam = (req.query.bbox as string | undefined) ?? '';
   const parts = bboxParam.split(',').map(Number);
 
@@ -26,6 +26,6 @@ export function getTiles(req: Request, res: Response): void {
     return;
   }
 
-  const tiles = getTilesInBoundingBox({ minLat, minLng, maxLat, maxLng });
+  const tiles = await getTilesInBoundingBox({ minLat, minLng, maxLat, maxLng });
   res.json({ tiles: wireTilesFromCells(tiles) });
 }

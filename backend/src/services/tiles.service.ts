@@ -17,11 +17,6 @@ export interface TileVisit {
   effort: number;
 }
 
-/**
- * Walk a GPS path and build a per-cell visit summary. Each visit captures
- * how long the runner stayed inside the H3 cell and how much distance they
- * covered there — feeding the effort calculation.
- */
 export function pathToTileVisits(path: GpsPoint[]): TileVisit[] {
   if (path.length < 2) return [];
 
@@ -51,9 +46,6 @@ export function pathToTileVisits(path: GpsPoint[]): TileVisit[] {
       v.distanceInTileM += segMeters;
       v.timeInTileMs += segMs;
     } else {
-      // Split a segment crossing cell boundaries half-and-half — same MVP
-      // tradeoff as the old grid system; full edge-aware splitting can use
-      // h3 line algorithms if needed later.
       const a = ensure(pCell);
       const b = ensure(cCell);
       a.distanceInTileM += segMeters / 2;
@@ -72,10 +64,6 @@ export function pathToTileVisits(path: GpsPoint[]): TileVisit[] {
   return [...visits.values()];
 }
 
-/**
- * GPS segments introduced by the latest batch only (previous tail → new points).
- * Same rules as {@link pathToTileVisits} but avoids reprocessing the full path.
- */
 export function segmentsToTileVisits(
   previousTail: GpsPoint | null,
   batch: GpsPoint[],
@@ -96,58 +84,19 @@ export function strengthDeltaFromEffort(effort: number): number {
   return Math.min(config.maxStrengthDeltaPerApply, Math.max(1, raw));
 }
 
-/**
- * Fold pending per-cell effort into mutations wherever threshold is met.
- * Clears consumed buckets; normalizes legacy `tileX:tileY` keys to H3 once.
- */
-export function consumePendingEffortIntoMutations(
-  pending: Record<string, number>,
-  user: User,
-  mode: ActivityMode = 'run',
-): { mutations: TileMutation[]; nextPending: Record<string, number> } {
-  const nextPending = normalizeLegacyPendingEffort(pending);
-  const mutations: TileMutation[] = [];
-
-  for (const h3Index of Object.keys(nextPending)) {
-    if (!isValidCell(h3Index)) {
-      delete nextPending[h3Index];
-      continue;
-    }
-    while ((nextPending[h3Index] ?? 0) >= config.minTileEffortToApply) {
-      const total = nextPending[h3Index]!;
-      const delta = strengthDeltaFromEffort(total);
-
-      mutations.push(applyStrengthDeltaToTile(h3Index, user, delta, mode));
-
-      const spent = Math.min(
-        total,
-        Math.max(config.minTileEffortToApply, delta * config.effortPerStrengthPoint),
-      );
-      nextPending[h3Index] = total - spent;
-    }
-  }
-
-  return { mutations, nextPending };
-}
-
 export interface TileMutation {
   tile: Tile;
   previousOwnerId: string | null;
   ownerChanged: boolean;
 }
 
-/**
- * Apply a territory mutation shaped by accumulated GPS effort (delta ∈ [1, max]).
- * Neutral cells become owned at {@link config.baseStrength}; same owner gains delta;
- * rival loses delta and may flip when strength hits zero or below.
- */
-export function applyStrengthDeltaToTile(
+export async function applyStrengthDeltaToTile(
   h3Index: string,
   user: User,
   strengthDelta: number,
   mode: ActivityMode = 'run',
-): TileMutation {
-  const existing = store.getTile(h3Index);
+): Promise<TileMutation> {
+  const existing = await store.getTile(h3Index);
   const previousOwnerId = existing?.ownerId ?? null;
   const now = Date.now();
 
@@ -188,7 +137,7 @@ export function applyStrengthDeltaToTile(
     }
   }
 
-  store.saveTile(nextTile);
+  await store.saveTile(nextTile);
   return {
     tile: nextTile,
     previousOwnerId,
@@ -196,57 +145,57 @@ export function applyStrengthDeltaToTile(
   };
 }
 
-/**
- * All H3 resolution-10 cells whose centers fall in `bbox`, each with persisted
- * territory data when present — otherwise an empty/neutral stub so clients can
- * draw the full hex grid (outline + fills for claimed cells).
- */
-export function getTilesInBoundingBox(bbox: BoundingBox): Tile[] {
+export async function consumePendingEffortIntoMutations(
+  pending: Record<string, number>,
+  user: User,
+  mode: ActivityMode = 'run',
+): Promise<{ mutations: TileMutation[]; nextPending: Record<string, number> }> {
+  const nextPending = normalizeLegacyPendingEffort(pending);
+  const mutations: TileMutation[] = [];
+
+  for (const h3Index of Object.keys(nextPending)) {
+    if (!isValidCell(h3Index)) {
+      delete nextPending[h3Index];
+      continue;
+    }
+    while ((nextPending[h3Index] ?? 0) >= config.minTileEffortToApply) {
+      const total = nextPending[h3Index]!;
+      const delta = strengthDeltaFromEffort(total);
+
+      mutations.push(await applyStrengthDeltaToTile(h3Index, user, delta, mode));
+
+      const spent = Math.min(
+        total,
+        Math.max(config.minTileEffortToApply, delta * config.effortPerStrengthPoint),
+      );
+      nextPending[h3Index] = total - spent;
+    }
+  }
+
+  return { mutations, nextPending };
+}
+
+export async function getTilesInBoundingBox(bbox: BoundingBox): Promise<Tile[]> {
   const indexes = h3IndexesForBoundingBox(bbox);
-  const out: Tile[] = [];
-  for (const h3Index of indexes) {
-    const existing = store.getTile(h3Index);
-    out.push(
-      existing ?? {
+  const stored = await store.getTilesByIndexes(indexes);
+  const storedMap = new Map(stored.map((t) => [t.h3Index, t]));
+
+  return indexes.map(
+    (h3Index) =>
+      storedMap.get(h3Index) ?? {
         h3Index,
         ownerId: null,
         ownerColor: null,
         strength: 0,
         lastUpdated: 0,
       },
-    );
-  }
-  return out;
+  );
 }
 
-export function getOwnedTileCount(userId: string): number {
-  return store.listTiles().filter((t) => t.ownerId === userId).length;
+export async function getOwnedTileCount(userId: string): Promise<number> {
+  return store.countTilesByOwner(userId);
 }
 
-/**
- * Background decay: every cell loses a bit of strength over time. Hits zero?
- * The cell becomes neutral and is up for grabs again.
- */
-export function decayAllTiles(amount = config.decay.amount): Tile[] {
-  const changed: Tile[] = [];
-  for (const tile of store.listTiles()) {
-    if (tile.ownerId === null) continue;
-    const nextStrength = tile.strength - amount;
-    if (nextStrength <= 0) {
-      changed.push(
-        store.saveTile({
-          ...tile,
-          ownerId: null,
-          ownerColor: null,
-          strength: 0,
-          lastUpdated: Date.now(),
-        }),
-      );
-    } else {
-      changed.push(
-        store.saveTile({ ...tile, strength: nextStrength, lastUpdated: Date.now() }),
-      );
-    }
-  }
-  return changed;
+export async function decayAllTiles(amount = config.decay.amount): Promise<Tile[]> {
+  return store.decayTiles(amount);
 }
