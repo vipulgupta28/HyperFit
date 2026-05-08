@@ -48,7 +48,6 @@ export default function MapScreen() {
   const tilesMap = useTilesStore((s) => s.tiles);
   const upsertMany = useTilesStore((s) => s.upsertMany);
   const user = useUserStore((s) => s.user);
-  const ensureUser = useUserStore((s) => s.ensureUser);
   const refreshUser = useUserStore((s) => s.refreshUser);
 
   const phase = useRunStore((s) => s.phase);
@@ -124,10 +123,6 @@ export default function MapScreen() {
     })();
     return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => {
-    ensureUser().catch(() => undefined);
-  }, [ensureUser]);
 
   // Auto-follow last GPS point during active run
   useEffect(() => {
@@ -266,6 +261,7 @@ export default function MapScreen() {
             key={tile.h3Index}
             tile={tile}
             meUserId={user?.id}
+            satellite={mapStyleMode !== 'standard'}
             onPress={handleTilePress}
           />
         ))}
@@ -337,30 +333,7 @@ export default function MapScreen() {
         )}
       </View>
 
-      {/* Active run banner */}
-      <Animated.View
-        style={[
-          styles.activeRunBanner,
-          {
-            transform: [{ translateY: bannerSlideAnim }],
-            borderColor: modeColor + '40',
-          },
-        ]}
-        pointerEvents={phase !== 'idle' ? 'auto' : 'none'}>
-        <View style={[styles.bannerDot, { backgroundColor: modeColor + '20' }]}>
-          <View style={[styles.bannerDotInner, { backgroundColor: modeColor }]} />
-        </View>
-        <Text style={styles.activeRunText}>
-          {phase === 'paused'
-            ? 'Run paused'
-            : mode === 'walk' ? 'Walk in progress' : 'Run in progress'}
-        </Text>
-        <Pressable onPress={() => router.navigate('/(tabs)/run')} style={styles.bannerCta}>
-          <Text style={[styles.activeRunCta, { color: modeColor }]}>Open</Text>
-          <Ionicons name="chevron-forward" size={13} color={modeColor} />
-        </Pressable>
-      </Animated.View>
-
+    
       {/* Location denied banner */}
       {permission === 'denied' && (
         <View style={styles.permissionBanner}>
@@ -477,26 +450,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  // Active run banner
-  activeRunBanner: {
-    position: 'absolute',
-    bottom: 28,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(10,10,10,0.92)',
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
-  },
+  
   bannerDot: {
     width: 20,
     height: 20,

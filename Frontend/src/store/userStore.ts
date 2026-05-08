@@ -3,10 +3,8 @@ import { create } from 'zustand';
 
 import { ApiUser, api } from '../services/api';
 
-const makeGuestId = () =>
-  `g_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-
 const USER_ID_KEY = 'mates_user_id';
+const JWT_KEY = 'mates_jwt';
 const ONBOARDED_KEY = 'mates_onboarded';
 
 interface UserState {
@@ -16,12 +14,12 @@ interface UserState {
   hasSeenOnboarding: boolean;
 
   setUser: (user: ApiUser) => void;
-  ensureUser: (preferredUsername?: string) => Promise<ApiUser>;
-  refreshUser: () => Promise<void>;
   checkStoredAuth: () => Promise<void>;
-  signIn: (userId: string, username?: string) => Promise<ApiUser>;
+  loginOAuth: (userId: string) => Promise<{ isNew: boolean }>;
+  registerUser: (userId: string, username: string) => Promise<ApiUser>;
   signOut: () => Promise<void>;
   markOnboardingDone: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -34,50 +32,53 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   checkStoredAuth: async () => {
     try {
-      const [storedId, onboarded] = await Promise.all([
-        SecureStore.getItemAsync(USER_ID_KEY),
+      const [token, onboarded] = await Promise.all([
+        SecureStore.getItemAsync(JWT_KEY),
         SecureStore.getItemAsync(ONBOARDED_KEY),
       ]);
       const hasSeenOnboarding = onboarded === 'true';
-      if (storedId) {
-        const { user } = await api.getUser(storedId);
+      if (token) {
+        const { user } = await api.verifyToken(token);
         set({ user, isAuthenticated: true, isCheckingAuth: false, hasSeenOnboarding });
       } else {
         set({ isCheckingAuth: false, hasSeenOnboarding });
       }
     } catch {
+      await SecureStore.deleteItemAsync(JWT_KEY);
       set({ isCheckingAuth: false });
     }
   },
 
-  signIn: async (userId: string, username?: string) => {
-    const { user } = await api.getUser(userId, username);
+  loginOAuth: async (userId: string) => {
+    const result = await api.login(userId);
+    if (!result.isNew && result.token && result.user) {
+      await SecureStore.setItemAsync(JWT_KEY, result.token);
+      await SecureStore.setItemAsync(USER_ID_KEY, result.user.id);
+      set({ user: result.user, isAuthenticated: true });
+    }
+    return { isNew: result.isNew };
+  },
+
+  registerUser: async (userId: string, username: string) => {
+    const { token, user } = await api.register(userId, username);
+    await SecureStore.setItemAsync(JWT_KEY, token);
     await SecureStore.setItemAsync(USER_ID_KEY, user.id);
-    // Do NOT mark onboarding done here — new users should see the guide
     set({ user, isAuthenticated: true });
     return user;
   },
 
   signOut: async () => {
-    await SecureStore.deleteItemAsync(USER_ID_KEY);
-    await SecureStore.deleteItemAsync(ONBOARDED_KEY);
+    await Promise.all([
+      SecureStore.deleteItemAsync(JWT_KEY),
+      SecureStore.deleteItemAsync(USER_ID_KEY),
+      SecureStore.deleteItemAsync(ONBOARDED_KEY),
+    ]);
     set({ user: null, isAuthenticated: false, hasSeenOnboarding: false });
   },
 
   markOnboardingDone: async () => {
     await SecureStore.setItemAsync(ONBOARDED_KEY, 'true');
     set({ hasSeenOnboarding: true });
-  },
-
-  ensureUser: async (preferredUsername) => {
-    const existing = get().user;
-    if (existing) return existing;
-    const id = makeGuestId();
-    const username = preferredUsername ?? 'Runner';
-    const { user } = await api.getUser(id, username);
-    await SecureStore.setItemAsync(USER_ID_KEY, user.id);
-    set({ user, isAuthenticated: true });
-    return user;
   },
 
   refreshUser: async () => {

@@ -79,21 +79,26 @@ export async function appendRunPoints(
       pending[v.h3Index] = (pending[v.h3Index] ?? 0) + v.effort;
     }
 
-    const { mutations: batchMutations, nextPending } =
-      await consumePendingEffortIntoMutations(pending, user, run.mode ?? 'run');
-    run.tileEffortPending = nextPending;
+    // Only apply tile mutations after 500 m — effort accumulates before that point
+    if (run.distance >= 500) {
+      const { mutations: batchMutations, nextPending } =
+        await consumePendingEffortIntoMutations(pending, user, run.mode ?? 'run');
+      run.tileEffortPending = nextPending;
 
-    let acc = run.netTerritoryDeltaAccum ?? 0;
-    let snap = { ...(run.liveTilesSnap ?? {}) };
-    for (const m of batchMutations) {
-      snap[m.tile.h3Index] = m.tile;
-      if (m.ownerChanged && m.tile.ownerId === user.id) acc++;
-      if (m.ownerChanged && m.previousOwnerId === user.id) acc--;
+      let acc = run.netTerritoryDeltaAccum ?? 0;
+      let snap = { ...(run.liveTilesSnap ?? {}) };
+      for (const m of batchMutations) {
+        snap[m.tile.h3Index] = m.tile;
+        if (m.ownerChanged && m.tile.ownerId === user.id) acc++;
+        if (m.ownerChanged && m.previousOwnerId === user.id) acc--;
+      }
+      run.liveTilesSnap = snap;
+      run.netTerritoryDeltaAccum = acc;
+
+      if (batchMutations.length > 0) mutations = batchMutations;
+    } else {
+      run.tileEffortPending = pending;
     }
-    run.liveTilesSnap = snap;
-    run.netTerritoryDeltaAccum = acc;
-
-    if (batchMutations.length > 0) mutations = batchMutations;
   }
 
   await store.saveRun(run);
@@ -114,19 +119,25 @@ export async function endRun(runId: string): Promise<EndRunResult> {
   const user = await getOrCreateUser(run.userId);
 
   const pending = { ...(run.tileEffortPending ?? {}) };
-  const { mutations: flushMutations, nextPending } =
-    await consumePendingEffortIntoMutations(pending, user, run.mode ?? 'run');
-  run.tileEffortPending = nextPending;
+  let flushMutations: TileMutation[] = [];
 
-  let acc = run.netTerritoryDeltaAccum ?? 0;
-  let snap = { ...(run.liveTilesSnap ?? {}) };
-  for (const m of flushMutations) {
-    snap[m.tile.h3Index] = m.tile;
-    if (m.ownerChanged && m.tile.ownerId === user.id) acc++;
-    if (m.ownerChanged && m.previousOwnerId === user.id) acc--;
+  if (run.distance >= 500) {
+    const result = await consumePendingEffortIntoMutations(pending, user, run.mode ?? 'run');
+    flushMutations = result.mutations;
+    run.tileEffortPending = result.nextPending;
+
+    let acc = run.netTerritoryDeltaAccum ?? 0;
+    let snap = { ...(run.liveTilesSnap ?? {}) };
+    for (const m of flushMutations) {
+      snap[m.tile.h3Index] = m.tile;
+      if (m.ownerChanged && m.tile.ownerId === user.id) acc++;
+      if (m.ownerChanged && m.previousOwnerId === user.id) acc--;
+    }
+    run.liveTilesSnap = snap;
+    run.netTerritoryDeltaAccum = acc;
+  } else {
+    run.tileEffortPending = {};
   }
-  run.liveTilesSnap = snap;
-  run.netTerritoryDeltaAccum = acc;
 
   const capturedCells: Tile[] = Object.values(run.liveTilesSnap ?? {});
   run.capturedTileIds = capturedCells.map((t) => t.h3Index);

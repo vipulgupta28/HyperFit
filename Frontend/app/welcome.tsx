@@ -84,13 +84,12 @@ function HexShape({ x, y, size, opacity, delay }: typeof HEX_POSITIONS[0]) {
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const signIn = useUserStore((s) => s.signIn);
-  const ensureUser = useUserStore((s) => s.ensureUser);
-  const [loading, setLoading] = useState<'google' | 'apple' | 'guest' | null>(null);
+  const loginOAuth = useUserStore((s) => s.loginOAuth);
+  const registerUser = useUserStore((s) => s.registerUser);
+  const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
   const [showUsernameSheet, setShowUsernameSheet] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState('');
-  // null = guest flow; string = OAuth userId to pass to signIn
   const pendingUserIdRef = useRef<string | null>(null);
   const sheetAnim = useRef(new Animated.Value(300)).current;
   const sheetBackdrop = useRef(new Animated.Value(0)).current;
@@ -144,15 +143,11 @@ export default function WelcomeScreen() {
     if (trimmed.length < 2) { setUsernameError('At least 2 characters required'); return; }
     if (trimmed.length > 20) { setUsernameError('20 characters max'); return; }
 
-    const userId = pendingUserIdRef.current;
+    const userId = pendingUserIdRef.current!;
     closeUsernameSheet();
-    setLoading(userId ? (userId.startsWith('apple_') ? 'apple' : 'google') : 'guest');
+    setLoading(userId.startsWith('apple_') ? 'apple' : 'google');
     try {
-      if (userId) {
-        await signIn(userId, trimmed);
-      } else {
-        await ensureUser(trimmed);
-      }
+      await registerUser(userId, trimmed);
       router.replace('/(tabs)');
     } catch {
       Alert.alert('Error', 'Could not complete sign-in. Please try again.');
@@ -168,9 +163,15 @@ export default function WelcomeScreen() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const googleUser = await res.json() as { id: string; name?: string; email?: string };
+      const userId = `google_${googleUser.id}`;
+      const { isNew } = await loginOAuth(userId);
+      if (!isNew) {
+        router.replace('/(tabs)');
+        return;
+      }
       const suggested = googleUser.name ?? googleUser.email?.split('@')[0] ?? '';
       setLoading(null);
-      openUsernameSheet(`google_${googleUser.id}`, suggested);
+      openUsernameSheet(userId, suggested);
     } catch {
       Alert.alert('Sign-in failed', 'Could not complete Google sign-in. Please try again.');
       setLoading(null);
@@ -203,6 +204,12 @@ export default function WelcomeScreen() {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
+      const userId = `apple_${credential.user}`;
+      const { isNew } = await loginOAuth(userId);
+      if (!isNew) {
+        router.replace('/(tabs)');
+        return;
+      }
       const firstName = credential.fullName?.givenName;
       const lastName = credential.fullName?.familyName;
       const suggested =
@@ -210,7 +217,7 @@ export default function WelcomeScreen() {
           ? `${firstName}${lastName}`
           : firstName ?? credential.email?.split('@')[0] ?? '';
       setLoading(null);
-      openUsernameSheet(`apple_${credential.user}`, suggested);
+      openUsernameSheet(userId, suggested);
     } catch (err: unknown) {
       if ((err as { code?: string }).code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Sign-in failed', 'Could not complete Apple sign-in. Please try again.');
@@ -218,8 +225,6 @@ export default function WelcomeScreen() {
       setLoading(null);
     }
   };
-
-  const handleGuest = () => openUsernameSheet(null, '');
 
   const isLoading = loading !== null;
 
@@ -297,27 +302,6 @@ export default function WelcomeScreen() {
             </View>
             <Text style={styles.googleButtonText}>
               {loading === 'google' ? 'Signing in…' : 'Continue with Google'}
-            </Text>
-          </Pressable>
-
-          {/* Divider */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Guest */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.guestButton,
-              pressed && styles.buttonPressed,
-              isLoading && loading !== 'guest' && styles.buttonDisabled,
-            ]}
-            onPress={handleGuest}
-            disabled={isLoading}>
-            <Text style={styles.guestButtonText}>
-              {loading === 'guest' ? 'Setting up…' : 'Continue as Guest'}
             </Text>
           </Pressable>
 

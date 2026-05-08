@@ -1,6 +1,11 @@
 import { Router } from 'express';
 
 import {
+  authLogin,
+  authRegister,
+  authVerify,
+} from '../controllers/auth.controller';
+import {
   postRunCancel,
   postRunEnd,
   postRunStart,
@@ -26,6 +31,10 @@ export const router = Router();
 router.get('/health', (_req, res) => {
   res.json({ ok: true, ts: Date.now() });
 });
+
+router.post('/auth/login', authLogin);
+router.post('/auth/register', authRegister);
+router.get('/auth/verify', authVerify);
 
 router.post('/run/start', postRunStart);
 router.post('/run/update', postRunUpdate);

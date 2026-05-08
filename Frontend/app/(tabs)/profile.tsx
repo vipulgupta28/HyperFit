@@ -220,7 +220,6 @@ const sectionTitleStyle = {
 // ── Main screen ───────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const ensureUser = useUserStore((s) => s.ensureUser);
   const setUser = useUserStore((s) => s.setUser);
   const user = useUserStore((s) => s.user);
   const signOut = useUserStore((s) => s.signOut);
@@ -234,12 +233,13 @@ export default function ProfileScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
-    const u = useUserStore.getState().user ?? (await ensureUser());
-    const { user: fresh, recentRuns: runs } = await api.getUser(u.id);
+    const currentUser = useUserStore.getState().user;
+    if (!currentUser) return;
+    const { user: fresh, recentRuns: runs } = await api.getUser(currentUser.id);
     setUser(fresh);
     setRecentRuns(runs);
     setRuns(runs);
-  }, [ensureUser, setUser, setRuns]);
+  }, [setUser, setRuns]);
 
   useEffect(() => {
     setLoading(true);

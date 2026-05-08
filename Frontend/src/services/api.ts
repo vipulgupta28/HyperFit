@@ -94,6 +94,23 @@ function client(): AxiosInstance {
 export const api = {
   baseUrl: () => getApiBaseUrl(),
 
+  login: async (userId: string): Promise<{ isNew: boolean; token?: string; user?: ApiUser }> => {
+    const { data } = await client().post('/auth/login', { userId });
+    return data;
+  },
+
+  register: async (userId: string, username: string): Promise<{ token: string; user: ApiUser }> => {
+    const { data } = await client().post('/auth/register', { userId, username });
+    return data;
+  },
+
+  verifyToken: async (token: string): Promise<{ user: ApiUser }> => {
+    const { data } = await client().get('/auth/verify', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  },
+
   startRun: async (userId: string, mode: ActivityMode = 'run'): Promise<{ run: ApiRun; user: ApiUser }> => {
     const { data } = await client().post('/run/start', { userId, mode });
     return data;

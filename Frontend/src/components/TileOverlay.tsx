@@ -7,10 +7,11 @@ import { ApiTile } from '../services/api';
 interface TileOverlayProps {
   tile: ApiTile;
   meUserId?: string | null;
+  satellite?: boolean;
   onPress?: (tile: ApiTile) => void;
 }
 
-function TileOverlayBase({ tile, meUserId, onPress }: TileOverlayProps) {
+function TileOverlayBase({ tile, meUserId, satellite, onPress }: TileOverlayProps) {
   const coords = tile.boundary;
   const ownerColor = tile.ownerColor ?? PALETTE.textDim;
   const isMine = meUserId != null && tile.ownerId === meUserId;
@@ -22,19 +23,17 @@ function TileOverlayBase({ tile, meUserId, onPress }: TileOverlayProps) {
 
   if (isUnclaimed) {
     fillColor = TILE_COLORS.unclaimedFill;
-    strokeColor = TILE_COLORS.unclaimedStroke;
+    strokeColor = satellite ? 'rgba(255,255,255,0.25)' : TILE_COLORS.unclaimedStroke;
     strokeWidth = 1;
   } else if (isMine) {
-    // My tiles: vibrant fill + bright stroke, scale with strength
     const fillOpacity = Math.min(0.6, TILE_COLORS.mineFillBase + tile.strength * 0.042);
     fillColor = hexToRgba(ownerColor, fillOpacity);
-    strokeColor = hexToRgba(ownerColor, TILE_COLORS.mineStrokeOpacity);
+    strokeColor = satellite ? 'rgba(255,255,255,0.85)' : hexToRgba(ownerColor, TILE_COLORS.mineStrokeOpacity);
     strokeWidth = 2;
   } else {
-    // Rival tiles: more muted, still visible
     const fillOpacity = Math.min(0.45, TILE_COLORS.rivalFillBase + tile.strength * 0.033);
     fillColor = hexToRgba(ownerColor, fillOpacity);
-    strokeColor = hexToRgba(ownerColor, TILE_COLORS.rivalStrokeOpacity);
+    strokeColor = satellite ? 'rgba(255,255,255,0.65)' : hexToRgba(ownerColor, TILE_COLORS.rivalStrokeOpacity);
     strokeWidth = 1;
   }
 
@@ -55,6 +54,7 @@ export const TileOverlay = memo(TileOverlayBase, (prev, next) =>
   prev.tile.ownerId === next.tile.ownerId &&
   prev.tile.strength === next.tile.strength &&
   prev.meUserId === next.meUserId &&
+  prev.satellite === next.satellite &&
   prev.onPress === next.onPress,
 );
 
