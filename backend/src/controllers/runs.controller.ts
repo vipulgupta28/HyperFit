@@ -18,7 +18,7 @@ export async function postRunStart(req: Request, res: Response): Promise<void> {
     username?: string;
     mode?: ActivityMode;
   };
-  const user = await getOrCreateUser(userId ?? username);
+  const user = await getOrCreateUser(userId ?? username ?? `anon_${Date.now().toString(36)}`);
   const run = await startRun(user.id, mode ?? 'run');
   res.status(201).json({ run, user });
 }

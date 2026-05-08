@@ -90,6 +90,8 @@ export default function WelcomeScreen() {
   const [showUsernameSheet, setShowUsernameSheet] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState('');
+  // null = guest flow; string = OAuth userId to pass to signIn
+  const pendingUserIdRef = useRef<string | null>(null);
   const sheetAnim = useRef(new Animated.Value(300)).current;
   const sheetBackdrop = useRef(new Animated.Value(0)).current;
 
@@ -116,20 +118,61 @@ export default function WelcomeScreen() {
     }
   }, [response]);
 
+  const openUsernameSheet = (userId: string | null, suggested: string) => {
+    pendingUserIdRef.current = userId;
+    setUsernameInput(suggested);
+    setUsernameError('');
+    setShowUsernameSheet(true);
+    Animated.parallel([
+      Animated.timing(sheetBackdrop, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.spring(sheetAnim, { toValue: 0, tension: 75, friction: 14, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const closeUsernameSheet = () => {
+    Animated.parallel([
+      Animated.timing(sheetBackdrop, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(sheetAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
+    ]).start(() => {
+      setShowUsernameSheet(false);
+      pendingUserIdRef.current = null;
+    });
+  };
+
+  const confirmUsername = async () => {
+    const trimmed = usernameInput.trim();
+    if (trimmed.length < 2) { setUsernameError('At least 2 characters required'); return; }
+    if (trimmed.length > 20) { setUsernameError('20 characters max'); return; }
+
+    const userId = pendingUserIdRef.current;
+    closeUsernameSheet();
+    setLoading(userId ? (userId.startsWith('apple_') ? 'apple' : 'google') : 'guest');
+    try {
+      if (userId) {
+        await signIn(userId, trimmed);
+      } else {
+        await ensureUser(trimmed);
+      }
+      router.replace('/(tabs)');
+    } catch {
+      Alert.alert('Error', 'Could not complete sign-in. Please try again.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleGoogleSuccess = async (accessToken: string) => {
     try {
       setLoading('google');
-      // Fetch Google user info
       const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const googleUser = await res.json() as { id: string; name?: string; email?: string };
-      const username = googleUser.name ?? googleUser.email?.split('@')[0] ?? 'Runner';
-      await signIn(`google_${googleUser.id}`, username);
-      router.replace('/(tabs)');
+      const suggested = googleUser.name ?? googleUser.email?.split('@')[0] ?? '';
+      setLoading(null);
+      openUsernameSheet(`google_${googleUser.id}`, suggested);
     } catch {
       Alert.alert('Sign-in failed', 'Could not complete Google sign-in. Please try again.');
-    } finally {
       setLoading(null);
     }
   };
@@ -162,59 +205,21 @@ export default function WelcomeScreen() {
       });
       const firstName = credential.fullName?.givenName;
       const lastName = credential.fullName?.familyName;
-      const username =
+      const suggested =
         firstName && lastName
-          ? `${firstName} ${lastName}`
-          : firstName ?? credential.email?.split('@')[0] ?? 'Runner';
-      await signIn(`apple_${credential.user}`, username);
-      router.replace('/(tabs)');
+          ? `${firstName}${lastName}`
+          : firstName ?? credential.email?.split('@')[0] ?? '';
+      setLoading(null);
+      openUsernameSheet(`apple_${credential.user}`, suggested);
     } catch (err: unknown) {
       if ((err as { code?: string }).code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Sign-in failed', 'Could not complete Apple sign-in. Please try again.');
       }
-    } finally {
       setLoading(null);
     }
   };
 
-  const handleGuest = () => {
-    setUsernameInput('');
-    setUsernameError('');
-    setShowUsernameSheet(true);
-    Animated.parallel([
-      Animated.timing(sheetBackdrop, { toValue: 1, duration: 220, useNativeDriver: true }),
-      Animated.spring(sheetAnim, { toValue: 0, tension: 75, friction: 14, useNativeDriver: true }),
-    ]).start();
-  };
-
-  const closeUsernameSheet = () => {
-    Animated.parallel([
-      Animated.timing(sheetBackdrop, { toValue: 0, duration: 180, useNativeDriver: true }),
-      Animated.timing(sheetAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
-    ]).start(() => setShowUsernameSheet(false));
-  };
-
-  const confirmUsername = async () => {
-    const trimmed = usernameInput.trim();
-    if (trimmed.length < 2) {
-      setUsernameError('At least 2 characters required');
-      return;
-    }
-    if (trimmed.length > 20) {
-      setUsernameError('20 characters max');
-      return;
-    }
-    closeUsernameSheet();
-    setLoading('guest');
-    try {
-      await ensureUser(trimmed);
-      router.replace('/(tabs)');
-    } catch {
-      Alert.alert('Error', 'Could not connect to server. Please check your connection.');
-    } finally {
-      setLoading(null);
-    }
-  };
+  const handleGuest = () => openUsernameSheet(null, '');
 
   const isLoading = loading !== null;
 

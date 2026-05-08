@@ -4,19 +4,22 @@ import { store } from '../models/store';
 import { User } from '../models/types';
 import { pickUserColor } from '../utils/colors';
 
-export async function getOrCreateUser(idOrUsername?: string): Promise<User> {
-  if (idOrUsername) {
-    const byId = await store.getUser(idOrUsername);
-    if (byId) return byId;
+export async function getOrCreateUser(id: string, preferredUsername?: string): Promise<User> {
+  // Always look up by ID first
+  const byId = await store.getUser(id);
+  if (byId) return byId;
 
-    const byName = await store.getUserByUsername(idOrUsername);
+  // Fall back to username lookup only when no explicit username is given
+  // (backward-compat: old guests had id === username)
+  if (!preferredUsername) {
+    const byName = await store.getUserByUsername(id);
     if (byName) return byName;
   }
 
-  const id = idOrUsername ?? uuid();
+  const username = preferredUsername ?? id;
   const user: User = {
     id,
-    username: idOrUsername ?? `Runner-${id.slice(0, 4)}`,
+    username,
     color: pickUserColor(id),
     totalDistance: 0,
     territoryCount: 0,

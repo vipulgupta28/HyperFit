@@ -3,6 +3,9 @@ import { create } from 'zustand';
 
 import { ApiUser, api } from '../services/api';
 
+const makeGuestId = () =>
+  `g_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+
 const USER_ID_KEY = 'mates_user_id';
 const ONBOARDED_KEY = 'mates_onboarded';
 
@@ -48,7 +51,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   signIn: async (userId: string, username?: string) => {
-    const { user } = await api.getUser(userId.length < 30 ? username ?? userId : userId);
+    const { user } = await api.getUser(userId, username);
     await SecureStore.setItemAsync(USER_ID_KEY, user.id);
     // Do NOT mark onboarding done here — new users should see the guide
     set({ user, isAuthenticated: true });
@@ -69,8 +72,9 @@ export const useUserStore = create<UserState>((set, get) => ({
   ensureUser: async (preferredUsername) => {
     const existing = get().user;
     if (existing) return existing;
+    const id = makeGuestId();
     const username = preferredUsername ?? 'Runner';
-    const { user } = await api.getUser(username);
+    const { user } = await api.getUser(id, username);
     await SecureStore.setItemAsync(USER_ID_KEY, user.id);
     set({ user, isAuthenticated: true });
     return user;

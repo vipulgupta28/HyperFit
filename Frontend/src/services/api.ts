@@ -127,8 +127,9 @@ export const api = {
     return data;
   },
 
-  getUser: async (userId: string): Promise<{ user: ApiUser; recentRuns: ApiRun[] }> => {
-    const { data } = await client().get(`/users/${encodeURIComponent(userId)}`);
+  getUser: async (userId: string, username?: string): Promise<{ user: ApiUser; recentRuns: ApiRun[] }> => {
+    const params = username ? { username } : undefined;
+    const { data } = await client().get(`/users/${encodeURIComponent(userId)}`, { params });
     return data;
   },
 

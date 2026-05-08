@@ -11,7 +11,8 @@ export async function getLeaderboardHandler(_req: Request, res: Response): Promi
 
 export async function getUserHandler(req: Request, res: Response): Promise<void> {
   const id = String(req.params.id ?? '');
-  const user = await getOrCreateUser(id);
+  const preferredUsername = (req.query.username as string | undefined)?.trim() || undefined;
+  const user = await getOrCreateUser(id, preferredUsername);
   user.territoryCount = await getOwnedTileCount(user.id);
   await store.saveUser(user);
 
