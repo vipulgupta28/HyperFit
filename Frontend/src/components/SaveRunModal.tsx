@@ -134,6 +134,8 @@ export function SaveRunModal({ visible, summary, runId, mode, onDone }: SaveRunM
           setSharing(false);
         }
       }
+    } else if (!save && runId) {
+      api.cancelRun(runId).catch(() => undefined);
     }
 
     Animated.parallel([

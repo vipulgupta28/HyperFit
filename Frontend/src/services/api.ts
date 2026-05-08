@@ -112,6 +112,10 @@ export const api = {
     return data;
   },
 
+  cancelRun: async (runId: string): Promise<void> => {
+    await client().post('/run/cancel', { runId });
+  },
+
   getTiles: async (bbox: {
     minLat: number;
     minLng: number;

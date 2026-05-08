@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 
+import { store } from '../models/store';
 import { ActivityMode, GpsPoint } from '../models/types';
 import {
   appendRunPoints,
@@ -53,4 +54,19 @@ export async function postRunEnd(req: Request, res: Response): Promise<void> {
   }
   emitTerritoryChanged(run.userId, await getOwnedTileCount(run.userId));
   res.json({ run, summary });
+}
+
+export async function postRunCancel(req: Request, res: Response): Promise<void> {
+  const { runId } = req.body as { runId: string };
+  if (!runId) {
+    res.status(400).json({ error: 'invalid_payload' });
+    return;
+  }
+
+  const run = await store.getRun(runId);
+  if (!run) { res.status(404).json({ error: 'run_not_found' }); return; }
+
+  run.status = 'cancelled';
+  await store.saveRun(run);
+  res.json({ ok: true });
 }

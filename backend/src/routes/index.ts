@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import {
+  postRunCancel,
   postRunEnd,
   postRunStart,
   postRunUpdate,
@@ -29,6 +30,7 @@ router.get('/health', (_req, res) => {
 router.post('/run/start', postRunStart);
 router.post('/run/update', postRunUpdate);
 router.post('/run/end', postRunEnd);
+router.post('/run/cancel', postRunCancel);
 
 router.get('/tiles', getTiles);
 

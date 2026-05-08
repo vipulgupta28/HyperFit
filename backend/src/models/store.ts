@@ -209,13 +209,15 @@ class SupabaseStore {
     return toRun(data as Record<string, unknown>);
   }
 
-  async listRunsByUser(userId: string): Promise<Run[]> {
-    const { data, error } = await supabase
+  async listRunsByUser(userId: string, status?: string): Promise<Run[]> {
+    let query = supabase
       .from('runs')
       .select('*')
       .eq('user_id', userId)
       .order('started_at', { ascending: false })
       .limit(50);
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
     if (error) throw new Error(`listRunsByUser: ${error.message}`);
     return ((data as Record<string, unknown>[]) ?? []).map(toRun);
   }

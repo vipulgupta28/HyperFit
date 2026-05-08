@@ -10,9 +10,11 @@ import {
   Alert,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -85,6 +87,11 @@ export default function WelcomeScreen() {
   const signIn = useUserStore((s) => s.signIn);
   const ensureUser = useUserStore((s) => s.ensureUser);
   const [loading, setLoading] = useState<'google' | 'apple' | 'guest' | null>(null);
+  const [showUsernameSheet, setShowUsernameSheet] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const sheetAnim = useRef(new Animated.Value(300)).current;
+  const sheetBackdrop = useRef(new Animated.Value(0)).current;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -170,10 +177,37 @@ export default function WelcomeScreen() {
     }
   };
 
-  const handleGuest = async () => {
+  const handleGuest = () => {
+    setUsernameInput('');
+    setUsernameError('');
+    setShowUsernameSheet(true);
+    Animated.parallel([
+      Animated.timing(sheetBackdrop, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.spring(sheetAnim, { toValue: 0, tension: 75, friction: 14, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const closeUsernameSheet = () => {
+    Animated.parallel([
+      Animated.timing(sheetBackdrop, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(sheetAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
+    ]).start(() => setShowUsernameSheet(false));
+  };
+
+  const confirmUsername = async () => {
+    const trimmed = usernameInput.trim();
+    if (trimmed.length < 2) {
+      setUsernameError('At least 2 characters required');
+      return;
+    }
+    if (trimmed.length > 20) {
+      setUsernameError('20 characters max');
+      return;
+    }
+    closeUsernameSheet();
     setLoading('guest');
     try {
-      await ensureUser('Runner');
+      await ensureUser(trimmed);
       router.replace('/(tabs)');
     } catch {
       Alert.alert('Error', 'Could not connect to server. Please check your connection.');
@@ -287,6 +321,54 @@ export default function WelcomeScreen() {
           </Text>
         </Animated.View>
       </SafeAreaView>
+
+      {/* Username sheet */}
+      {showUsernameSheet && (
+        <>
+          <Animated.View
+            style={[styles.sheetBackdrop, { opacity: sheetBackdrop }]}
+            pointerEvents="box-none">
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={closeUsernameSheet} />
+          </Animated.View>
+
+          <KeyboardAvoidingView
+            style={styles.sheetKbWrap}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetAnim }] }]}>
+              <View style={styles.sheetHandle} />
+
+              <Text style={styles.sheetTitle}>Choose your username</Text>
+              <Text style={styles.sheetSub}>This is how others will see you on the map.</Text>
+
+              <TextInput
+                style={[styles.sheetInput, usernameError ? styles.sheetInputError : null]}
+                value={usernameInput}
+                onChangeText={(t) => { setUsernameInput(t); setUsernameError(''); }}
+                placeholder="e.g. SwiftRunner42"
+                placeholderTextColor="rgba(255,255,255,0.25)"
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={20}
+                returnKeyType="done"
+                onSubmitEditing={confirmUsername}
+                selectionColor={PALETTE.primary}
+              />
+              {usernameError ? (
+                <Text style={styles.sheetError}>{usernameError}</Text>
+              ) : (
+                <Text style={styles.sheetHint}>{usernameInput.trim().length}/20</Text>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [styles.sheetConfirmBtn, pressed && { opacity: 0.85 }]}
+                onPress={confirmUsername}>
+                <Text style={styles.sheetConfirmText}>Continue</Text>
+              </Pressable>
+            </Animated.View>
+          </KeyboardAvoidingView>
+        </>
+      )}
     </View>
   );
 }
@@ -431,5 +513,97 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
     marginTop: 4,
+  },
+
+  // Username sheet
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    zIndex: 10,
+  },
+  sheetKbWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 11,
+  },
+  sheet: {
+    backgroundColor: '#0D0D14',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    shadowColor: '#000',
+    shadowOpacity: 0.9,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 30,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 22,
+  },
+  sheetTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  sheetSub: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 22,
+  },
+  sheetInput: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    color: '#fff',
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  sheetInputError: {
+    borderColor: 'rgba(248,113,113,0.6)',
+  },
+  sheetError: {
+    color: 'rgba(248,113,113,0.85)',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  sheetHint: {
+    color: 'rgba(255,255,255,0.25)',
+    fontSize: 11,
+    marginTop: 6,
+    marginLeft: 4,
+    textAlign: 'right',
+  },
+  sheetConfirmBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  sheetConfirmText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

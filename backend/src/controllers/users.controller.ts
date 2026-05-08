@@ -15,6 +15,6 @@ export async function getUserHandler(req: Request, res: Response): Promise<void>
   user.territoryCount = await getOwnedTileCount(user.id);
   await store.saveUser(user);
 
-  const recentRuns = await store.listRunsByUser(user.id);
+  const recentRuns = await store.listRunsByUser(user.id, 'ended');
   res.json({ user, recentRuns: recentRuns.slice(0, 10) });
 }
