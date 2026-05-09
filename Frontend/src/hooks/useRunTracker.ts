@@ -35,7 +35,6 @@ export function useRunTracker(): UseRunTrackerResult {
   const endingRef = useRef(false);
   const smoothedRef = useRef<GpsPointPayload | null>(null);
 
-  const ensureUser = useUserStore((s) => s.ensureUser);
   const refreshUser = useUserStore((s) => s.refreshUser);
 
   const flush = useCallback(async () => {
@@ -127,12 +126,16 @@ export function useRunTracker(): UseRunTrackerResult {
       return;
     }
 
-    const user = await ensureUser();
+    const user = useUserStore.getState().user;
+    if (!user) {
+      useRunStore.getState().setError('not_authenticated');
+      return;
+    }
     const mode = useRunStore.getState().mode;
     const { run } = await api.startRun(user.id, mode);
     useRunStore.getState().beginRun(run.id);
     await beginWatching();
-  }, [beginWatching, ensureUser]);
+  }, [beginWatching]);
 
   const pause = useCallback(() => {
     useRunStore.getState().pause();

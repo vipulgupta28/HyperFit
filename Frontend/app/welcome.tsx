@@ -10,9 +10,11 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -25,24 +27,20 @@ import { useUserStore } from '@/src/store/userStore';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-// Replace these with your actual Google OAuth client IDs from Google Cloud Console
-// Run: npx expo install expo-auth-session expo-web-browser
 const GOOGLE_IOS_CLIENT_ID = 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com';
 const GOOGLE_ANDROID_CLIENT_ID = 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com';
 const GOOGLE_WEB_CLIENT_ID = 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com';
 
-// Hexagon positions for background decoration
 const HEX_POSITIONS = [
-  { x: -30, y: 80, size: 120, opacity: 0.07, delay: 0 },
-  { x: width - 60, y: 120, size: 90, opacity: 0.05, delay: 400 },
-  { x: width * 0.4, y: 60, size: 70, opacity: 0.06, delay: 200 },
-  { x: 60, y: height * 0.35, size: 100, opacity: 0.04, delay: 600 },
-  { x: width - 40, y: height * 0.4, size: 130, opacity: 0.06, delay: 300 },
-  { x: width * 0.3, y: height * 0.55, size: 80, opacity: 0.05, delay: 500 },
-  { x: -20, y: height * 0.65, size: 110, opacity: 0.07, delay: 100 },
-  { x: width * 0.7, y: height * 0.7, size: 95, opacity: 0.04, delay: 700 },
+  { x: -30, y: 60, size: 130, opacity: 0.07, delay: 0 },
+  { x: width - 70, y: 100, size: 100, opacity: 0.05, delay: 400 },
+  { x: width * 0.4, y: 40, size: 75, opacity: 0.06, delay: 200 },
+  { x: 50, y: width * 0.8, size: 110, opacity: 0.04, delay: 600 },
+  { x: width - 50, y: width * 0.9, size: 140, opacity: 0.05, delay: 300 },
+  { x: width * 0.25, y: width * 1.1, size: 90, opacity: 0.05, delay: 500 },
+  { x: -20, y: width * 1.3, size: 120, opacity: 0.06, delay: 100 },
 ];
 
 function HexShape({ x, y, size, opacity, delay }: typeof HEX_POSITIONS[0]) {
@@ -60,11 +58,6 @@ function HexShape({ x, y, size, opacity, delay }: typeof HEX_POSITIONS[0]) {
     return () => seq.stop();
   }, [anim, delay]);
 
-  const animatedOpacity = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [opacity * 0.4, opacity],
-  });
-
   return (
     <Animated.View
       style={[
@@ -74,35 +67,84 @@ function HexShape({ x, y, size, opacity, delay }: typeof HEX_POSITIONS[0]) {
           top: y,
           width: size,
           height: size * 0.866,
-          borderColor: PALETTE.text,
-          opacity: animatedOpacity,
+          opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [opacity * 0.4, opacity] }),
         },
       ]}
     />
   );
 }
 
+// ── Page dot indicator ───────────────────────────────────────────────────────
+
+function PageDots({ scrollX }: { scrollX: Animated.Value }) {
+  return (
+    <View style={styles.dotsRow}>
+      {[0, 1, 2].map((i) => {
+        const dotWidth = scrollX.interpolate({
+          inputRange: [(i - 1) * width, i * width, (i + 1) * width],
+          outputRange: [6, 24, 6],
+          extrapolate: 'clamp',
+        });
+        const opacity = scrollX.interpolate({
+          inputRange: [(i - 1) * width, i * width, (i + 1) * width],
+          outputRange: [0.25, 1, 0.25],
+          extrapolate: 'clamp',
+        });
+        return (
+          <Animated.View key={i} style={[styles.dot, { width: dotWidth, opacity }]} />
+        );
+      })}
+    </View>
+  );
+}
+
+// ── Feature row (How to Play) ────────────────────────────────────────────────
+
+function FeatureRow({
+  icon,
+  color,
+  gradient,
+  title,
+  desc,
+}: {
+  icon: string;
+  color: string;
+  gradient: [string, string];
+  title: string;
+  desc: string;
+}) {
+  return (
+    <View style={styles.featureRow}>
+      <LinearGradient colors={[gradient[0] + '30', gradient[1] + '10']} style={styles.featureIconWrap}>
+        <Ionicons name={icon as never} size={22} color={color} />
+      </LinearGradient>
+      <View style={styles.featureText}>
+        <Text style={styles.featureTitle}>{title}</Text>
+        <Text style={styles.featureDesc}>{desc}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Main screen ──────────────────────────────────────────────────────────────
+
 export default function WelcomeScreen() {
   const router = useRouter();
   const loginOAuth = useUserStore((s) => s.loginOAuth);
   const registerUser = useUserStore((s) => s.registerUser);
+
   const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
   const [showUsernameSheet, setShowUsernameSheet] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState('');
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageHeight, setPageHeight] = useState(0);
+
   const pendingUserIdRef = useRef<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
   const sheetAnim = useRef(new Animated.Value(300)).current;
   const sheetBackdrop = useRef(new Animated.Value(0)).current;
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(40)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
-    ]).start();
-  }, [fadeAnim, slideAnim]);
 
   const [request, response, promptGoogleAsync] = Google.useAuthRequest({
     iosClientId: GOOGLE_IOS_CLIENT_ID,
@@ -116,6 +158,13 @@ export default function WelcomeScreen() {
       handleGoogleSuccess(response.authentication?.accessToken ?? '');
     }
   }, [response]);
+
+  const goToPage = (page: number) => {
+    scrollRef.current?.scrollTo({ x: width * page, animated: true });
+    setCurrentPage(page);
+  };
+
+  // ── Username sheet ───────────────────────────────────────────────────────
 
   const openUsernameSheet = (userId: string | null, suggested: string) => {
     pendingUserIdRef.current = userId;
@@ -142,7 +191,6 @@ export default function WelcomeScreen() {
     const trimmed = usernameInput.trim();
     if (trimmed.length < 2) { setUsernameError('At least 2 characters required'); return; }
     if (trimmed.length > 20) { setUsernameError('20 characters max'); return; }
-
     const userId = pendingUserIdRef.current!;
     closeUsernameSheet();
     setLoading(userId.startsWith('apple_') ? 'apple' : 'google');
@@ -156,6 +204,8 @@ export default function WelcomeScreen() {
     }
   };
 
+  // ── Auth handlers ────────────────────────────────────────────────────────
+
   const handleGoogleSuccess = async (accessToken: string) => {
     try {
       setLoading('google');
@@ -165,10 +215,7 @@ export default function WelcomeScreen() {
       const googleUser = await res.json() as { id: string; name?: string; email?: string };
       const userId = `google_${googleUser.id}`;
       const { isNew } = await loginOAuth(userId);
-      if (!isNew) {
-        router.replace('/(tabs)');
-        return;
-      }
+      if (!isNew) { router.replace('/(tabs)'); return; }
       const suggested = googleUser.name ?? googleUser.email?.split('@')[0] ?? '';
       setLoading(null);
       openUsernameSheet(userId, suggested);
@@ -180,19 +227,11 @@ export default function WelcomeScreen() {
 
   const handleGoogleSignIn = async () => {
     if (GOOGLE_WEB_CLIENT_ID === 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com') {
-      Alert.alert(
-        'Google Sign-In',
-        'Configure your Google OAuth client IDs in app/welcome.tsx to enable Google sign-in.',
-        [{ text: 'OK' }],
-      );
+      Alert.alert('Google Sign-In', 'Configure your Google OAuth client IDs in app/welcome.tsx to enable Google sign-in.', [{ text: 'OK' }]);
       return;
     }
     setLoading('google');
-    try {
-      await promptGoogleAsync();
-    } finally {
-      setLoading(null);
-    }
+    try { await promptGoogleAsync(); } finally { setLoading(null); }
   };
 
   const handleAppleSignIn = async () => {
@@ -206,16 +245,12 @@ export default function WelcomeScreen() {
       });
       const userId = `apple_${credential.user}`;
       const { isNew } = await loginOAuth(userId);
-      if (!isNew) {
-        router.replace('/(tabs)');
-        return;
-      }
+      if (!isNew) { router.replace('/(tabs)'); return; }
       const firstName = credential.fullName?.givenName;
       const lastName = credential.fullName?.familyName;
-      const suggested =
-        firstName && lastName
-          ? `${firstName}${lastName}`
-          : firstName ?? credential.email?.split('@')[0] ?? '';
+      const suggested = firstName && lastName
+        ? `${firstName}${lastName}`
+        : firstName ?? credential.email?.split('@')[0] ?? '';
       setLoading(null);
       openUsernameSheet(userId, suggested);
     } catch (err: unknown) {
@@ -228,87 +263,190 @@ export default function WelcomeScreen() {
 
   const isLoading = loading !== null;
 
+  // ── Render ───────────────────────────────────────────────────────────────
+
   return (
     <View style={styles.root}>
-      {/* Gradient background */}
+      {/* Background gradient */}
       <LinearGradient
-        colors={['#0A0A14', '#000000', '#0A0610']}
-        locations={[0, 0.5, 1]}
+        colors={['#0A0C1A', '#06080F', '#0C0810']}
+        locations={[0, 0.55, 1]}
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Animated hexagon grid */}
+      {/* Hex grid decoration */}
       <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-        {HEX_POSITIONS.map((hex, i) => (
-          <HexShape key={i} {...hex} />
-        ))}
+        {HEX_POSITIONS.map((hex, i) => <HexShape key={i} {...hex} />)}
       </View>
 
       <SafeAreaView style={styles.safe}>
-        {/* Hero content */}
-        <Animated.View
-          style={[
-            styles.hero,
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-          ]}>
-          <View style={styles.logoWrap}>
-            <View style={styles.logoHex}>
-              <Text style={styles.logoHexText}>⬡</Text>
-            </View>
-          </View>
-
-          <Text style={styles.appName}>HYPERFIT</Text>
-          <Text style={styles.tagline}>Claim Your Territory</Text>
-          <Text style={styles.sub}>
-            Walk and run to capture hexagonal tiles on the real-world map.{'\n'}
-            Build your empire. Defend it.
-          </Text>
-        </Animated.View>
-
-        {/* Auth buttons */}
-        <Animated.View
-          style={[
-            styles.authSection,
-            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-          ]}>
-          {/* Apple Sign In — iOS only */}
-          {Platform.OS === 'ios' && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.googleButton,
-                pressed && styles.buttonPressed,
-                isLoading && loading !== 'apple' && styles.buttonDisabled,
-              ]}
-              onPress={handleAppleSignIn}
-              disabled={isLoading}>
-              <Ionicons name="logo-apple" size={20} color="#000" />
-              <Text style={styles.googleButtonText}>
-                {loading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
-              </Text>
+        {/* Skip button — pages 0 & 1 */}
+        <View style={styles.topBar}>
+          <View style={{ flex: 1 }} />
+          {currentPage < 2 && (
+            <Pressable onPress={() => goToPage(2)} style={styles.skipBtn}>
+              <Text style={styles.skipText}>Skip</Text>
+              <Ionicons name="chevron-forward" size={13} color={PALETTE.textDim} />
             </Pressable>
           )}
+        </View>
 
-          {/* Google Sign In */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.googleButton,
-              pressed && styles.buttonPressed,
-              isLoading && loading !== 'google' && styles.buttonDisabled,
-            ]}
-            onPress={handleGoogleSignIn}
-            disabled={isLoading}>
-            <View style={styles.googleIconWrap}>
-              <Text style={styles.googleIconText}>G</Text>
+        {/* Pager */}
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          style={{ flex: 1 }}
+          onLayout={(e) => setPageHeight(e.nativeEvent.layout.height)}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            { useNativeDriver: false },
+          )}
+          onMomentumScrollEnd={(e) => {
+            setCurrentPage(Math.round(e.nativeEvent.contentOffset.x / width));
+          }}>
+
+          {/* ── PAGE 1: Intro ── */}
+          {pageHeight > 0 && (
+            <View style={[styles.page, { height: pageHeight }]}>
+              <View style={styles.pageContent}>
+                <Image
+                  source={require('../assets/images/Logo.png')}
+                  style={styles.logoImg}
+                  resizeMode="contain"
+                />
+                <Text style={styles.appTagline}>CLAIM YOUR TERRITORY</Text>
+                <Text style={styles.appDesc}>
+                  Walk and run through the real world to capture hexagonal tiles on the map.
+                  Build an empire, defend your ground.
+                </Text>
+              </View>
+
+              <Pressable style={styles.nextBtn} onPress={() => goToPage(1)}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)']}
+                  style={styles.nextBtnInner}>
+                  <Text style={styles.nextBtnText}>How it works</Text>
+                  <Ionicons name="arrow-forward" size={16} color={PALETTE.text} />
+                </LinearGradient>
+              </Pressable>
             </View>
-            <Text style={styles.googleButtonText}>
-              {loading === 'google' ? 'Signing in…' : 'Continue with Google'}
-            </Text>
-          </Pressable>
+          )}
 
-          <Text style={styles.legal}>
-            By continuing you agree to our Terms of Service and Privacy Policy.
-          </Text>
-        </Animated.View>
+          {/* ── PAGE 2: How to Play ── */}
+          {pageHeight > 0 && (
+            <View style={[styles.page, { height: pageHeight }]}>
+              <View style={styles.pageContent}>
+                <View style={styles.howHeader}>
+                  <Text style={styles.howEyebrow}>HOW IT WORKS</Text>
+                  <Text style={styles.howTitle}>Three simple rules.</Text>
+                </View>
+
+                <View style={styles.featuresCard}>
+                  <FeatureRow
+                    icon="walk-outline"
+                    color={PALETTE.walkPrimary}
+                    gradient={['#38BDF8', '#0EA5E9']}
+                    title="Move through the city"
+                    desc="Walk or run outside — every step you take claims the hexagonal tiles beneath your feet."
+                  />
+                  <View style={styles.featureDivider} />
+                  <FeatureRow
+                    icon="hexagon-outline"
+                    color="#A78BFA"
+                    gradient={['#8B5CF6', '#6D28D9']}
+                    title="Build your territory"
+                    desc="Tiles you capture are painted your colour on the shared map. Stack them to grow your empire."
+                  />
+                  <View style={styles.featureDivider} />
+                  <FeatureRow
+                    icon="shield-outline"
+                    color={PALETTE.runPrimary}
+                    gradient={['#FB923C', '#F97316']}
+                    title="Defend your ground"
+                    desc="Tiles gain strength the more you run through them. Stay active or rivals will reclaim them."
+                  />
+                </View>
+              </View>
+
+              <Pressable style={styles.nextBtn} onPress={() => goToPage(2)}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.07)']}
+                  style={styles.nextBtnInner}>
+                  <Text style={styles.nextBtnText}>Get started</Text>
+                  <Ionicons name="arrow-forward" size={16} color={PALETTE.text} />
+                </LinearGradient>
+              </Pressable>
+            </View>
+          )}
+
+          {/* ── PAGE 3: Auth ── */}
+          {pageHeight > 0 && (
+            <View style={[styles.page, { height: pageHeight }]}>
+              <View style={styles.pageContent}>
+                <View style={styles.authHero}>
+                  <View style={styles.authIconRing}>
+                    <LinearGradient
+                      colors={['rgba(56,189,248,0.2)', 'rgba(139,92,246,0.2)']}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <Ionicons name="map-outline" size={32} color={PALETTE.text} />
+                  </View>
+                  <Text style={styles.authTitle}>Join the map</Text>
+                  <Text style={styles.authSub}>
+                    Create your account and start claiming territory today.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.authSection}>
+                {Platform.OS === 'ios' && (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.authBtn,
+                      pressed && styles.authBtnPressed,
+                      isLoading && loading !== 'apple' && styles.authBtnDisabled,
+                    ]}
+                    onPress={handleAppleSignIn}
+                    disabled={isLoading}>
+                    <Ionicons name="logo-apple" size={20} color="#000" />
+                    <Text style={styles.authBtnText}>
+                      {loading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
+                    </Text>
+                  </Pressable>
+                )}
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.authBtn,
+                    styles.authBtnOutline,
+                    pressed && styles.authBtnPressed,
+                    isLoading && loading !== 'google' && styles.authBtnDisabled,
+                  ]}
+                  onPress={handleGoogleSignIn}
+                  disabled={isLoading}>
+                  <View style={styles.googleIconWrap}>
+                    <Text style={styles.googleIconText}>G</Text>
+                  </View>
+                  <Text style={[styles.authBtnText, styles.authBtnTextOutline]}>
+                    {loading === 'google' ? 'Signing in…' : 'Continue with Google'}
+                  </Text>
+                </Pressable>
+
+                <Text style={styles.legal}>
+                  By continuing you agree to our Terms of Service and Privacy Policy.
+                </Text>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Dots indicator */}
+        <PageDots scrollX={scrollX} />
+
+        <View style={{ height: 8 }} />
       </SafeAreaView>
 
       {/* Username sheet */}
@@ -325,7 +463,6 @@ export default function WelcomeScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetAnim }] }]}>
               <View style={styles.sheetHandle} />
-
               <Text style={styles.sheetTitle}>Choose your username</Text>
               <Text style={styles.sheetSub}>This is how others will see you on the map.</Text>
 
@@ -363,79 +500,207 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
-  safe: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24, paddingBottom: 20 },
+  root: { flex: 1, backgroundColor: '#06080F' },
+  safe: { flex: 1 },
 
-  // Hex background shape
   hexShape: {
     position: 'absolute',
     borderWidth: 1,
     borderRadius: 4,
+    borderColor: 'rgba(255,255,255,0.6)',
     transform: [{ rotate: '30deg' }],
   },
 
-  // Hero section
-  hero: {
+  // Top bar
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+    minHeight: 44,
+  },
+  skipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  skipText: {
+    color: PALETTE.textDim,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Page dots
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
+  },
+
+  // Pages
+  page: {
+    width,
+    paddingHorizontal: 24,
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+  },
+  pageContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 40,
+    paddingTop: 16,
   },
-  logoWrap: {
-    marginBottom: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  // Page 1 — Intro
+  logoImg: {
+    width: width * 0.72,
+    height: width * 0.36,
+    marginBottom: 32,
   },
-  logoHex: {
-    width: 88,
-    height: 88,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#fff',
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
-  },
-  logoHexText: {
-    fontSize: 48,
-    lineHeight: 56,
-  },
-  appName: {
-    fontSize: 52,
-    fontWeight: '800',
-    color: PALETTE.text,
-    letterSpacing: 12,
-    textAlign: 'center',
-  },
-  tagline: {
-    fontSize: 16,
-    fontWeight: '400',
+  appTagline: {
+    fontSize: 13,
+    fontWeight: '700',
     color: PALETTE.textMuted,
     letterSpacing: 4,
     textAlign: 'center',
-    marginTop: 10,
     textTransform: 'uppercase',
+    marginBottom: 16,
   },
-  sub: {
-    fontSize: 14,
+  appDesc: {
+    fontSize: 15,
+    color: PALETTE.textDim,
+    textAlign: 'center',
+    lineHeight: 24,
+    maxWidth: 300,
+  },
+
+  // Page 2 — How it works
+  howHeader: {
+    alignSelf: 'flex-start',
+    marginBottom: 28,
+  },
+  howEyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: PALETTE.textDim,
+    letterSpacing: 3,
+    marginBottom: 6,
+  },
+  howTitle: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: PALETTE.text,
+    letterSpacing: -0.5,
+    lineHeight: 36,
+  },
+  featuresCard: {
+    width: '100%',
+    backgroundColor: PALETTE.surfaceCard,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    padding: 20,
+    gap: 0,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+    paddingVertical: 14,
+  },
+  featureDivider: {
+    height: 1,
+    backgroundColor: PALETTE.border,
+    marginHorizontal: -20,
+  },
+  featureIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  featureText: { flex: 1, gap: 3 },
+  featureTitle: {
+    color: PALETTE.text,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+  },
+  featureDesc: {
+    color: PALETTE.textDim,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  // Next button (pages 1 & 2)
+  nextBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  nextBtnInner: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  nextBtnText: {
+    color: PALETTE.text,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+
+  // Page 3 — Auth hero
+  authHero: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  authIconRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  authTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: PALETTE.text,
+    letterSpacing: -0.5,
+  },
+  authSub: {
+    fontSize: 15,
     color: PALETTE.textDim,
     textAlign: 'center',
     lineHeight: 22,
-    marginTop: 24,
-    maxWidth: 300,
+    maxWidth: 260,
   },
 
   // Auth section
   authSection: {
     gap: 12,
-    paddingTop: 8,
+    paddingBottom: 4,
   },
-  googleButton: {
+  authBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -443,6 +708,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     height: 56,
     gap: 12,
+  },
+  authBtnOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  authBtnPressed: { opacity: 0.75 },
+  authBtnDisabled: { opacity: 0.35 },
+  authBtnText: {
+    color: '#000',
+    fontWeight: '600',
+    fontSize: 16,
+    letterSpacing: 0.2,
+  },
+  authBtnTextOutline: {
+    color: PALETTE.text,
   },
   googleIconWrap: {
     width: 26,
@@ -457,57 +738,18 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 15,
   },
-  googleButtonText: {
-    color: '#000000',
-    fontWeight: '600',
-    fontSize: 16,
-    letterSpacing: 0.2,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginVertical: 4,
-  },
-  dividerLine: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: PALETTE.border,
-  },
-  dividerText: {
-    color: PALETTE.textDim,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  guestButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    height: 54,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PALETTE.borderLight,
-    backgroundColor: 'transparent',
-  },
-  guestButtonText: {
-    color: PALETTE.textMuted,
-    fontWeight: '600',
-    fontSize: 15,
-    letterSpacing: 0.3,
-  },
-  buttonPressed: { opacity: 0.75 },
-  buttonDisabled: { opacity: 0.4 },
   legal: {
     color: PALETTE.textDim,
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 16,
-    marginTop: 4,
+    marginTop: 2,
   },
 
   // Username sheet
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     zIndex: 10,
   },
   sheetKbWrap: {
@@ -518,11 +760,11 @@ const styles = StyleSheet.create({
     zIndex: 11,
   },
   sheet: {
-    backgroundColor: '#0D0D14',
+    backgroundColor: '#0D0F1A',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 24,
     paddingBottom: 40,
     shadowColor: '#000',
@@ -548,25 +790,23 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   sheetSub: {
-    color: 'rgba(255,255,255,0.45)',
+    color: 'rgba(255,255,255,0.4)',
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 22,
   },
   sheetInput: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.1)',
     color: '#fff',
     fontFamily: 'Poppins_400Regular',
     fontSize: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  sheetInputError: {
-    borderColor: 'rgba(248,113,113,0.6)',
-  },
+  sheetInputError: { borderColor: 'rgba(248,113,113,0.6)' },
   sheetError: {
     color: 'rgba(248,113,113,0.85)',
     fontSize: 12,
@@ -575,7 +815,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   sheetHint: {
-    color: 'rgba(255,255,255,0.25)',
+    color: 'rgba(255,255,255,0.22)',
     fontSize: 11,
     marginTop: 6,
     marginLeft: 4,
