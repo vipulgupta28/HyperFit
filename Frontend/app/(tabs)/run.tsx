@@ -89,11 +89,7 @@ function ModeToggle({ mode, onChange, disabled }: ModeToggleProps) {
             style={styles.segOption}
             onPress={() => { if (!disabled && m !== mode) onChange(m); }}
             disabled={disabled}>
-            <Ionicons
-              name={m === 'walk' ? 'walk-outline' : 'flash-outline'}
-              size={15}
-              color={active ? '#000' : PALETTE.textDim}
-            />
+           
             <Text style={[styles.segLabel, active ? styles.segLabelActive : styles.segLabelInactive]}>
               {m === 'walk' ? 'Walk' : 'Run'}
             </Text>
@@ -540,12 +536,7 @@ export default function RunScreen() {
             <Pressable
               style={[styles.startBtn, { backgroundColor: modeAccent }]}
               onPress={start}>
-              <Ionicons
-                name={mode === 'walk' ? 'walk' : 'flash'}
-                size={18}
-                color="#000"
-                style={{ marginRight: 8 }}
-              />
+            
               <Text style={styles.startBtnLabel}>
                 Start {mode === 'walk' ? 'Walk' : 'Run'}
               </Text>

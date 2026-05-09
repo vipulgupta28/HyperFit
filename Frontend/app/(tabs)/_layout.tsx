@@ -45,7 +45,7 @@ export default function TabLayout() {
         options={{
           title: 'Start',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'flash' : 'flash-outline'} size={23} color={color} />
+            <Ionicons name={focused ? 'walk' : 'walk-outline'} size={23} color={color} />
           ),
         }}
       />

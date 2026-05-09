@@ -64,11 +64,7 @@ function TabToggle({
         const isActive = active === tab;
         return (
           <Pressable key={tab} style={tabStyles.option} onPress={() => onChange(tab)}>
-            <Ionicons
-              name={tab === 'global' ? 'globe-outline' : 'location-outline'}
-              size={14}
-              color={isActive ? '#000' : PALETTE.textDim}
-            />
+           
             <Text style={[tabStyles.label, isActive ? tabStyles.labelActive : tabStyles.labelInactive]}>
               {tab === 'global' ? 'Global' : 'Nearby'}
             </Text>
@@ -144,14 +140,7 @@ function LeaderRow({
     <Animated.View style={{ opacity: fadeAnim }}>
       <View style={[rowStyles.row, isMe && rowStyles.rowMe]}>
         {/* Rank / medal */}
-        {isTop3 ? (
-          <View
-            style={[rowStyles.medalWrap, { borderColor: MEDAL_COLORS[rank - 1] + '55' }]}>
-            <Ionicons name="trophy" size={14} color={MEDAL_COLORS[rank - 1]} />
-          </View>
-        ) : (
-          <Text style={rowStyles.rank}>#{rank}</Text>
-        )}
+        
 
         {/* Avatar dot */}
         <View style={[rowStyles.avatar, { backgroundColor: user.color }]}>
