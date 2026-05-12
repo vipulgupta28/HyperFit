@@ -190,6 +190,7 @@ export default function RunScreen() {
   const mapRef = useRef<MapView | null>(null);
   const followModeRef = useRef(true);
   const lastCameraUpdate = useRef(0);
+  const isZoomingRef = useRef(false);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const zoomTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const splashOpacity = useRef(new Animated.Value(0)).current;
@@ -291,6 +292,7 @@ export default function RunScreen() {
     zoomTimersRef.current = [];
 
     setIsZooming(true);
+    isZoomingRef.current = true;
 
     // Snap to full-Earth altitude instantly, hidden behind the splash
     splashOpacity.setValue(1);
@@ -305,26 +307,47 @@ export default function RunScreen() {
       { duration: 0 },
     );
 
-    // Fade splash to reveal the globe, then let ONE uninterrupted animation
-    // carry the camera all the way from Earth to street level.
+    // Two-stage zoom: world → city (fast), city → street (slow settle).
+    // This matches the logarithmic nature of zoom so the animation feels
+    // smooth rather than spending most time at continental altitudes.
+    const STAGE1 = 2000; // world → city
+    const STAGE2 = 2200; // city → street
+    const DELAY = 200;   // time for the instant snap to register on native side
+
     const t1 = setTimeout(() => {
       Animated.timing(splashOpacity, { toValue: 0, duration: 600, useNativeDriver: true }).start();
 
-      // Single smooth dive — no second call to interrupt this.
       mapRef.current?.animateCamera(
         {
           center: { latitude: region.latitude, longitude: region.longitude },
-          altitude: 300,
-          zoom: MAP_FOLLOW_ZOOM,
+          altitude: 50_000,
+          zoom: 13,
           pitch: 0,
           heading: 0,
         },
-        { duration: 4200 },
+        { duration: STAGE1 },
       );
-    }, 120);
 
-    // Switch map type back after animation completes
-    const t2 = setTimeout(() => setIsZooming(false), 4600);
+      const t3 = setTimeout(() => {
+        mapRef.current?.animateCamera(
+          {
+            center: { latitude: region.latitude, longitude: region.longitude },
+            altitude: 300,
+            zoom: MAP_FOLLOW_ZOOM,
+            pitch: 0,
+            heading: 0,
+          },
+          { duration: STAGE2 },
+        );
+      }, STAGE1);
+
+      zoomTimersRef.current.push(t3);
+    }, DELAY);
+
+    const t2 = setTimeout(() => {
+      setIsZooming(false);
+      isZoomingRef.current = false;
+    }, DELAY + STAGE1 + STAGE2 + 300);
 
     zoomTimersRef.current = [t1, t2];
     return () => zoomTimersRef.current.forEach(clearTimeout);
@@ -353,6 +376,7 @@ export default function RunScreen() {
 
   const onRegionChangeComplete = useCallback(
     (next: Region) => {
+      if (isZoomingRef.current) return;
       followModeRef.current = false;
       setFollowMode(false);
       if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
