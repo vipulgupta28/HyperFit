@@ -292,12 +292,12 @@ export default function RunScreen() {
 
     setIsZooming(true);
 
-    // Instantly jump to a whole-Earth view (hidden behind splash)
+    // Snap to full-Earth altitude instantly, hidden behind the splash
     splashOpacity.setValue(1);
     mapRef.current.animateCamera(
       {
         center: { latitude: region.latitude, longitude: region.longitude },
-        altitude: 12_000_000,
+        altitude: 13_500_000,
         zoom: 1,
         pitch: 0,
         heading: 0,
@@ -305,23 +305,12 @@ export default function RunScreen() {
       { duration: 0 },
     );
 
-    // Fade out splash revealing Earth, begin pull-in to continent level
+    // Fade splash to reveal the globe, then let ONE uninterrupted animation
+    // carry the camera all the way from Earth to street level.
     const t1 = setTimeout(() => {
-      Animated.timing(splashOpacity, { toValue: 0, duration: 700, useNativeDriver: true }).start();
-      mapRef.current?.animateCamera(
-        {
-          center: { latitude: region.latitude, longitude: region.longitude },
-          altitude: 180_000,
-          zoom: 8,
-          pitch: 0,
-          heading: 0,
-        },
-        { duration: 2000 },
-      );
-    }, 200);
+      Animated.timing(splashOpacity, { toValue: 0, duration: 600, useNativeDriver: true }).start();
 
-    // Final dive to street level
-    const t2 = setTimeout(() => {
+      // Single smooth dive — no second call to interrupt this.
       mapRef.current?.animateCamera(
         {
           center: { latitude: region.latitude, longitude: region.longitude },
@@ -330,14 +319,14 @@ export default function RunScreen() {
           pitch: 0,
           heading: 0,
         },
-        { duration: 1600 },
+        { duration: 4200 },
       );
-    }, 2300);
+    }, 120);
 
-    // Restore normal map type
-    const t3 = setTimeout(() => setIsZooming(false), 4100);
+    // Switch map type back after animation completes
+    const t2 = setTimeout(() => setIsZooming(false), 4600);
 
-    zoomTimersRef.current = [t1, t2, t3];
+    zoomTimersRef.current = [t1, t2];
     return () => zoomTimersRef.current.forEach(clearTimeout);
   }, [zoomKey, region, splashOpacity]);
 

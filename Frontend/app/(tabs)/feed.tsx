@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Text } from '@/src/components/Text';
 
+import { AppLoader } from '@/src/components/AppLoader';
 import { PostCard } from '@/src/components/PostCard';
 import { PALETTE } from '@/src/constants/game';
 import { ApiPost, api } from '@/src/services/api';
@@ -101,7 +102,7 @@ export default function FeedScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
-        <ActivityIndicator color={PALETTE.primary} size="large" />
+        <AppLoader />
       </SafeAreaView>
     );
   }

@@ -10,9 +10,10 @@ import {
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import 'react-native-reanimated';
 
+import { AppLoader } from '@/src/components/AppLoader';
 import { OnboardingGuide } from '@/src/components/OnboardingGuide';
 import { PALETTE } from '@/src/constants/game';
 import { useUserStore } from '@/src/store/userStore';
@@ -105,7 +106,7 @@ export default function RootLayout() {
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        <ActivityIndicator color={PALETTE.text} size="large" />
+        <AppLoader />
       </View>
     );
   }

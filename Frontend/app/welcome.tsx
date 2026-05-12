@@ -30,8 +30,8 @@ WebBrowser.maybeCompleteAuthSession();
 const { width } = Dimensions.get('window');
 
 const GOOGLE_IOS_CLIENT_ID = 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com';
-const GOOGLE_ANDROID_CLIENT_ID = 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com';
-const GOOGLE_WEB_CLIENT_ID = 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = '225862909743-hmts13ljvuuj0dj60us1b47obfav8gu8.apps.googleusercontent.com';
+const GOOGLE_WEB_CLIENT_ID = '225862909743-dbpr56bet94sn3ctlsrrvfauirq10eai.apps.googleusercontent.com';
 
 const HEX_POSITIONS = [
   { x: -30, y: 60, size: 130, opacity: 0.07, delay: 0 },
@@ -226,10 +226,7 @@ export default function WelcomeScreen() {
   };
 
   const handleGoogleSignIn = async () => {
-    if (GOOGLE_WEB_CLIENT_ID === 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com') {
-      Alert.alert('Google Sign-In', 'Configure your Google OAuth client IDs in app/welcome.tsx to enable Google sign-in.', [{ text: 'OK' }]);
-      return;
-    }
+   
     setLoading('google');
     try { await promptGoogleAsync(); } finally { setLoading(null); }
   };
@@ -312,11 +309,7 @@ export default function WelcomeScreen() {
           {pageHeight > 0 && (
             <View style={[styles.page, { height: pageHeight }]}>
               <View style={styles.pageContent}>
-                <Image
-                  source={require('../assets/images/Logo.png')}
-                  style={styles.logoImg}
-                  resizeMode="contain"
-                />
+              <Text style={styles.logo}>HYPERFIT</Text>
                 <Text style={styles.appTagline}>CLAIM YOUR TERRITORY</Text>
                 <Text style={styles.appDesc}>
                   Walk and run through the real world to capture hexagonal tiles on the map.
@@ -411,9 +404,9 @@ export default function WelcomeScreen() {
                     ]}
                     onPress={handleAppleSignIn}
                     disabled={isLoading}>
-                    <Ionicons name="logo-apple" size={20} color="#000" />
+                    <Ionicons name="logo-apple" size={25} color="#000" />
                     <Text style={styles.authBtnText}>
-                      {loading === 'apple' ? 'Signing in…' : 'Sign in with Apple'}
+                      {loading === 'apple' ? 'Signing in…' : 'Continue with Apple'}
                     </Text>
                   </Pressable>
                 )}
@@ -500,15 +493,25 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#06080F' },
+  root: { flex: 1, backgroundColor: '#000' },
   safe: { flex: 1 },
 
   hexShape: {
     position: 'absolute',
     borderWidth: 1,
     borderRadius: 4,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: 'white',
     transform: [{ rotate: '30deg' }],
+  },
+
+  logo: {
+    color: "white",
+    fontSize: 45,
+    fontWeight: 700,
+    paddingBottom: 10,
+    letterSpacing: 20,
+    textAlign: "center",
+    alignSelf: "center",
   },
 
   // Top bar
@@ -564,7 +567,7 @@ const styles = StyleSheet.create({
   // Page 1 — Intro
   logoImg: {
     width: width * 0.72,
-    height: width * 0.36,
+    height: width ,
     marginBottom: 32,
   },
   appTagline: {

@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   FlatList,
   Pressable,
@@ -11,6 +10,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { AppLoader } from '@/src/components/AppLoader';
 import { Text } from '@/src/components/Text';
 
 import { PALETTE } from '@/src/constants/game';
@@ -264,7 +264,7 @@ export default function ProfileScreen() {
   if (loading || !user) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
-        <ActivityIndicator color={PALETTE.primary} />
+        <AppLoader />
       </SafeAreaView>
     );
   }

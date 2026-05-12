@@ -9,6 +9,7 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.hyperfit.game",
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "infoPlist": {

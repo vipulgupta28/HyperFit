@@ -15,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { AppLoader } from '@/src/components/AppLoader';
 import { Text } from '@/src/components/Text';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -115,7 +116,7 @@ export default function PostDetailScreen() {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
         {loading ? (
-          <ActivityIndicator color={PALETTE.primary} size="large" />
+          <AppLoader />
         ) : (
           <>
             <Ionicons name="alert-circle-outline" size={40} color={PALETTE.textDim} />

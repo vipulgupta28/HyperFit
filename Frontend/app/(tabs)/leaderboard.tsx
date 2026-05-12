@@ -2,7 +2,6 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Pressable,
   RefreshControl,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { Text } from '@/src/components/Text';
 
+import { AppLoader } from '@/src/components/AppLoader';
 import { PALETTE } from '@/src/constants/game';
 import { ApiUser, api } from '@/src/services/api';
 import { useTilesStore } from '@/src/store/tilesStore';
@@ -313,7 +313,7 @@ export default function LeaderboardScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={PALETTE.primary} />
+          <AppLoader />
         </View>
       ) : (
         <ScrollView
