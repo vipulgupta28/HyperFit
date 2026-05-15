@@ -152,7 +152,7 @@ export function OrbitLoader() {
             style={{
               position: 'absolute',
               width: B,
-              height: B,
+              height: B,      
               backgroundColor: FG,
               left: pos[i].x,
               top: pos[i].y,
